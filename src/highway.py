@@ -1,5 +1,6 @@
 from car import Car
 
+
 class Highway:
     def __init__(self, length: float):
         self.length = length
@@ -7,14 +8,18 @@ class Highway:
         self.time = 0
 
     def __str__(self):
-        return f"Highway(length={self.length}, cars=[\n" + "\n".join(
-            [f"\t{car}" for car in self.cars]
-        ) + "\n])"
+        return (
+            f"Highway(length={self.length}, cars=[\n"
+            + "\n".join([f"\t{car}" for car in self.cars])
+            + "\n])"
+        )
 
     def __repr__(self):
-        return f"Highway(length={self.length}, cars=[\n" + "\n".join(
-            [f"\t{car}" for car in self.cars]
-        ) + "\n])"
+        return (
+            f"Highway(length={self.length}, cars=[\n"
+            + "\n".join([f"\t{car}" for car in self.cars])
+            + "\n])"
+        )
 
     def get_front_car(self):
         return self.cars[-1]
@@ -39,7 +44,7 @@ class Highway:
             return
 
         if car.get_position() > self.length:
-            #raise ValueError("Car position is greater than highway length")
+            # raise ValueError("Car position is greater than highway length")
             return
 
         if len(self.cars) > 0:
@@ -57,10 +62,12 @@ class Highway:
 
             if len(self.cars) > 0:
                 self.cars[-1].f_car = None
-        
+
         if len(self.cars) == 0:
             return 2
-    
+
+        self.time += 1
+
         return 1
 
     def run(self, time: float):

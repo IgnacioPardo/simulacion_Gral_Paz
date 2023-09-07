@@ -1,4 +1,3 @@
-
 from random import randint
 from typing import Optional
 
@@ -21,9 +20,20 @@ class Car:
 
         self.t = 0
 
+        # Internally, we use SI units
+        # Position in meters
+        # Velocity in m/s
+        # Acceleration is in m/s^2
+
+        # Externally, we use km/h for velocity
+        # But we convert it to m/s internally
+
         self.x = x
-        self.v = v
+
+        self.v = v / 3.6
+
         self.vmax = vmax
+
         self.a = a
         self.length = l
 
@@ -34,7 +44,8 @@ class Car:
         self.b_car = bc
 
         self.will_measure = will_measure
-        
+
+        self.crashed = False
 
     def __str__(self):
         return f"Car(x={self.x}, v={self.v}, vmax={self.vmax}, a={self.a}, l={self.length}, tr={self.reaction_time}, vd={self.desired_velocity}, fc={self.f_car}, bc={self.b_car})"
@@ -43,25 +54,25 @@ class Car:
         return f"Car(x={self.x}, v={self.v}, vmax={self.vmax}, a={self.a}, l={self.length}, tr={self.reaction_time}, vd={self.desired_velocity}, fc={self.f_car}, bc={self.b_car})"
 
     def check_crash(self):
-        if self.distance_to_front_car() < 0:
-            print("Crash!")
-            return True
-        else:
-            return False
+        if self.distance_to_front_car():
+            if self.distance_to_front_car() <= 0:
+                print("Crash!")
+                self.crashed = True
 
     def check_rear_end(self):
-        if self.distance_to_back_car() < 0:
-            print("Rear end!")
-            return True
-        else:
-            return False
+        if self.distance_to_front_car():
+            if self.distance_to_back_car() <= 0:
+                print("Rear end!")
+                self.crashed = True
+
+    def collides(self):
+        return self.crashed
 
     def accelerate(self):
         if self.v < self.vmax:
             self.v = self.v + self.a
         else:
             self.v = self.vmax
-
 
         if self.v < 0:
             self.v = 0
@@ -97,7 +108,7 @@ class Car:
         return self.x
 
     def custom_behavior(self):
-        #if self.x > 300 and self.x < 1000:
+        # if self.x > 300 and self.x < 1000:
         #    self.v = 40
 
         # random behavior
@@ -107,11 +118,25 @@ class Car:
             else:
                 self.v += randint(0, 10)
 
+    def dead_stop(self):
+        if self.v > 0:
+            if self.v > 10:
+                self.v -= 10
+            else:
+                self.v = 0
+
     def update(self):
-        self.custom_behavior()
-        self.accelerate()
-        self.decelerate()
-        self.keep_velocity()
-        self.move()
+
+        if not self.crashed:
+            self.check_crash()
+
+            self.custom_behavior()
+            self.accelerate()
+            self.decelerate()
+            self.keep_velocity()
+            self.move()
+
+        else:
+            self.dead_stop()
 
         self.t += 1

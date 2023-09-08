@@ -176,43 +176,40 @@ class Car:
 
             # With a ceartain probability, the car will stop
 
-
-            if self.v < self.desired_velocity:
-                if self.f_car is not None:
-
-                    # If front car has crashed, stop
-                    if self.f_car.collides():
-                        self.action_queue.append(
-                            (self.stop, frame + self.reaction_time)
-                        )
-
-                    elif self.distance_to_front_car() <= self.v:
-
-                        self.action_queue.append(
-                            (self.stop, frame + self.reaction_time)
-                        )
-                    elif self.distance_to_front_car() <= 2 * self.v:
-                        # LEQ Two seconds of distance: Decelerate
-                        self.action_queue.append(
-                            (self.decelerate, frame + self.reaction_time)
-                        )
-                    else:
-                        self.action_queue.append(
-                            (self.accelerate, frame + self.reaction_time)
-                        )
-            else:
-                self.action_queue.append(
-                    (self.keep_velocity, frame + self.reaction_time)
-                )
+            self.behaviour(frame)
 
             # Take actions
-            for action, action_frame in self.action_queue:
-                if frame <= action_frame:
-                    action()
-
-            # Remove actions that have been taken
-            self.action_queue = [
-                action for action in self.action_queue if action[1] >= frame
-            ]
+            self.resolve_actions(frame)
 
         self.t += 1
+
+    def resolve_actions(self, frame):
+        for action, action_frame in self.action_queue:
+            if frame <= action_frame:
+                action()
+
+            # Remove actions that have been taken
+        self.action_queue = [
+            action for action in self.action_queue if action[1] >= frame
+        ]
+
+    def behaviour(self, frame):
+        if self.v < self.desired_velocity:
+            if self.f_car is not None:
+                # If front car has crashed, stop
+                if self.f_car.collides():
+                    self.action_queue.append((self.stop, frame + self.reaction_time))
+
+                elif self.distance_to_front_car() <= self.v:
+                    self.action_queue.append((self.stop, frame + self.reaction_time))
+                elif self.distance_to_front_car() <= 2 * self.v:
+                    # LEQ Two seconds of distance: Decelerate
+                    self.action_queue.append(
+                        (self.decelerate, frame + self.reaction_time)
+                    )
+                else:
+                    self.action_queue.append(
+                        (self.accelerate, frame + self.reaction_time)
+                    )
+        else:
+            self.action_queue.append((self.keep_velocity, frame + self.reaction_time))

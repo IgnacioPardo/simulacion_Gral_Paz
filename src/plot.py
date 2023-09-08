@@ -119,7 +119,7 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
 
         for _ in range(PRECISION):
             status = agp.update(frame)
-            agp.tow_cars(now=True)
+            # agp.tow_cars(now=True)
 
         # if len(agp.get_cars()) < 5:
         # if np.random.uniform() < 0.1:
@@ -133,7 +133,13 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
                     a=max(0, int(np.random.normal(2, 1))),
                     amax=np.random.uniform(1.5, 3),
                     length=1.5,
-                    tr=0.44,
+                    # Reaction times are between 0.4 and 1 seconds, 
+                    #   Mean:  0.7316666666666668
+                    #   Median:  0.725
+                    #   Variance:  0.026653888888888883
+                    #   Standard Deviation:  0.16326018770321465
+                    #   Skewness:  -0.040838018027236994
+                    tr=np.random.normal(0.7316666666666668, 0.16326018770321465),
                     vd=100,
                     fc=None,
                     bc=None,

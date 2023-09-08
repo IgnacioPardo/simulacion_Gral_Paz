@@ -60,11 +60,17 @@ class Car:
 
         self.action_queue = []
 
+        self.highway = None
+
+        self.increased_attention = False
+
+        self.stopping = False
+
     def __str__(self):
-        return f"Car(x={self.x}, v={self.v}, vmax={self.vmax}, a={self.a}, l={self.length}, tr={self.reaction_time}, vd={self.desired_velocity}, fc={self.f_car}, bc={self.b_car})"
+        return f"Car(x={self.x}, v={self.v}, vmax={self.vmax}, a={self.a}, l={self.length}, tr={self.get_reaction_time()}, vd={self.desired_velocity}, fc={self.f_car}, bc={self.b_car})"
 
     def __repr__(self):
-        return f"Car(x={self.x}, v={self.v}, vmax={self.vmax}, a={self.a}, l={self.length}, tr={self.reaction_time}, vd={self.desired_velocity}, fc={self.f_car}, bc={self.b_car})"
+        return f"Car(x={self.x}, v={self.v}, vmax={self.vmax}, a={self.a}, l={self.length}, tr={self.get_reaction_time()}, vd={self.desired_velocity}, fc={self.f_car}, bc={self.b_car})"
 
     def check_crash(self):
         if (
@@ -100,9 +106,7 @@ class Car:
         self.a -= self.throttle_acc
 
     def stop(self):
-        # self.a = -self.stopping_acc * self.v
-        self.a = 0
-        self.v = 0
+        self.stopping = True
 
     def keep_velocity(self):
         pass
@@ -147,6 +151,9 @@ class Car:
     def get_initial_frame(self):
         return self.init_frame
 
+    def set_highway(self, highway):
+        self.highway = highway
+
     def update(self, frame: int):
 
         self.check_crash()
@@ -157,17 +164,22 @@ class Car:
             self.action_queue = []
 
         else:
-            # Update position
-            self.x = self.x + self.v * 0.01
 
-            # Update velocity
-            self.v = self.v + self.a * 0.01
+            if self.stopping:
+                self.v = max(0, self.v - self.stopping_acc)
+            else:
+                # Update position
+                self.x = self.x + self.v * 0.01
+
+                # Update velocity
+                self.v = self.v + self.a * 0.01
 
             if self.v > self.vmax:
                 self.v = self.vmax
 
             if self.v < 0:
                 self.v = 0
+                self.stopping = False
 
             # Decision making
 
@@ -184,32 +196,79 @@ class Car:
         self.t += 1
 
     def resolve_actions(self, frame):
-        for action, action_frame in self.action_queue:
-            if frame <= action_frame:
-                action()
+        if frame % 100 == 0:
+            for action, action_frame in self.action_queue:
+                if frame <= action_frame:
+                    action()
 
             # Remove actions that have been taken
-        self.action_queue = [
-            action for action in self.action_queue if action[1] >= frame
-        ]
+            self.action_queue = [
+                action for action in self.action_queue if action[1] >= frame
+            ]
+
+    def increase_attention(self):
+        self.increased_attention = True
+
+    def default_attention(self):
+        self.increased_attention = False
+
+    def get_reaction_time(self):
+        if self.increased_attention:
+            return self.reaction_time / 2
+        else:
+            return self.reaction_time
 
     def behaviour(self, frame):
+        # If there are cars in front of me, I will slow down
+        # if self.f_car is not None and self.f_car.collides():
+        # if self.highway.has_crashes():
+        front_crash = False
+        if self.highway:
+            for car in self.highway.get_cars():
+                if car.x > self.x and car.collides():
+                    front_crash = True
+                    break
+
+        if front_crash:
+            if not self.increased_attention:
+                self.action_queue.append((self.increase_attention, frame + 1))
+            self.action_queue.append(
+                (self.decelerate, frame + self.get_reaction_time())
+            )
+        else:
+            self.action_queue.append((self.default_attention, frame + 1))
+            self.action_queue.append(
+                (self.keep_velocity, frame + self.get_reaction_time())
+            )
+            
+        if self.f_car is not None:
+            if self.f_car.a < 0:
+                # If the front car is braking, I will brake
+                self.action_queue.append(
+                    (self.decelerate, frame + self.get_reaction_time())
+                )
+
         if self.v < self.desired_velocity:
             if self.f_car is not None:
                 # If front car has crashed, stop
-                if self.f_car.collides():
-                    self.action_queue.append((self.stop, frame + self.reaction_time))
-
-                elif self.distance_to_front_car() <= self.v:
-                    self.action_queue.append((self.stop, frame + self.reaction_time))
-                elif self.distance_to_front_car() <= 2 * self.v:
+                if self.f_car.collides() or self.distance_to_front_car() <= self.v:
+                    self.action_queue.append(
+                        (self.stop, frame + self.get_reaction_time())
+                    )
+                elif self.distance_to_front_car() <= 5 * self.v:
                     # LEQ Two seconds of distance: Decelerate
                     self.action_queue.append(
-                        (self.decelerate, frame + self.reaction_time)
+                        (self.decelerate, frame + self.get_reaction_time())
                     )
                 else:
                     self.action_queue.append(
-                        (self.accelerate, frame + self.reaction_time)
+                        (self.accelerate, frame + self.get_reaction_time())
                     )
+            else:
+                self.action_queue.append(
+                    (self.accelerate, frame + self.get_reaction_time())
+                )
         else:
-            self.action_queue.append((self.keep_velocity, frame + self.reaction_time))
+            self.action_queue.append(
+                (self.keep_velocity, frame + self.get_reaction_time())
+            )

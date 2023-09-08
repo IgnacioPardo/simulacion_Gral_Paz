@@ -8,7 +8,7 @@ class Highway:
         self.time = 0
 
         self.crashes = []
-        self.crash_remove_delay = 1
+        self.crash_remove_delay = 5000
 
     def __str__(self):
         return (
@@ -56,13 +56,16 @@ class Highway:
 
         self.cars.append(car)
 
+        car.set_highway(self)
+
     def remove_car(self, car: Car):
-        self.cars.remove(car)
+        if car in self.cars:
+            print(f"AGP: Removing car {car.id} from highway at frame {self.time}")
+            self.cars.remove(car)
 
     def tow_cars(self, now: bool = False):
         for car, frame in self.crashes:
             if now or frame + self.crash_remove_delay == self.time:
-                print(f"AGP: Removing car {car.id} from highway")
                 self.remove_car(car)
                 self.crashes.remove((car, frame))
 
@@ -71,10 +74,11 @@ class Highway:
             car.update(frame)
 
             if car.crashed:
-                if (car, frame) not in self.crashes:
+                if car not in [c for c, _ in self.crashes]:
+                    print(f"AGP: Car {car.id} crashed at frame {frame}, queueing tow")
                     self.crashes.append((car, frame))
-            
-            if len(self.crashes) > 0:
+
+            if self.has_crashes():
                 self.tow_cars()
 
             if car.get_position() > self.length:
@@ -89,6 +93,9 @@ class Highway:
         self.time += 1
 
         return 1
+
+    def has_crashes(self) -> bool:
+        return len(self.crashes) > 0
 
     def run(self, time: float):
         pass

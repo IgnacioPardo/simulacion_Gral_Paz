@@ -1,13 +1,13 @@
 from car import Car
 from highway import Highway
 
-from utils import rotate_bound
+# from utils import rotate_bound
 
 from matplotlib import animation, pyplot as plt
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 
 import numpy as np
-import cv2
+# import cv2
 
 from tqdm import tqdm
 
@@ -58,7 +58,7 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
     fig.tight_layout()
 
     ax.set_xlim(0, agp.length)
-    ax.set_ylim(-3, 12)
+    ax.set_ylim(-3, 13)
 
     # ax hide y axis
     ax.set_yticks([])
@@ -88,17 +88,14 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
         dashes=(5, 5),
     )
 
-
     car_ims = [
         OffsetImage(plt.imread(f"assets/{car_color}.png", format="png"), zoom=0.4)
         for car_color in car_colors
     ]
 
-
     def init():
         # Animate with AnnotationBbox for each car
         return []
-
 
     def update(frame):
 
@@ -117,13 +114,15 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
             # txt.set_visible(False)
             txt.remove()
 
-        for _ in range(PRECISION):
-            status = agp.update(frame)
-            # agp.tow_cars(now=True)
+        for sub_t in range(PRECISION):
+            status = agp.update(frame * PRECISION + sub_t)
+
+        # if frame % 10 == 0:
+        #    agp.tow_cars(now=True)
 
         # if len(agp.get_cars()) < 5:
         # if np.random.uniform() < 0.1:
-        if agp.get_back_car().get_position() > agp.length / np.random.normal(20, 2):
+        if agp.get_back_car().get_position() > agp.length / np.random.normal(40, 2):
 
             agp.add_car(
                 Car(
@@ -133,18 +132,18 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
                     a=max(0, int(np.random.normal(2, 1))),
                     amax=np.random.uniform(1.5, 3),
                     length=1.5,
-                    # Reaction times are between 0.4 and 1 seconds, 
+                    # Reaction times are between 0.4 and 1 seconds,
                     #   Mean:  0.7316666666666668
                     #   Median:  0.725
                     #   Variance:  0.026653888888888883
                     #   Standard Deviation:  0.16326018770321465
                     #   Skewness:  -0.040838018027236994
                     tr=np.random.normal(0.7316666666666668, 0.16326018770321465),
-                    vd=100,
+                    vd=int(np.random.normal(100, 5)),
                     fc=None,
                     bc=None,
                     will_measure=True,
-                    car_id=len(agp.get_cars()),
+                    car_id=np.random.randint(0, 1000000),
                 )
             )
 
@@ -184,15 +183,19 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
         adata = agp.get_cars_accelerations()
         tdata = agp.get_cars_times()
         crashes = [1 if car.crashed else 0 for car in agp.get_cars()]
+        stopped = [1 if car.stopping else 0 for car in agp.get_cars()]
         ids = [car.id for car in agp.get_cars()]
 
+        dis = lambda x: list(map(lambda x: f"{x:.2f}", x))
+
         # Plot car velocities and positions as text
-        ax.text(0.1, 0.9, f"Accelerations: {adata}", transform=ax.transAxes)
-        ax.text(0.1, 0.8, f"Velocities: {vdata}", transform=ax.transAxes)
-        ax.text(0.1, 0.7, f"Positions: {xdata}", transform=ax.transAxes)
-        ax.text(0.1, 0.6, f"Times: {tdata}", transform=ax.transAxes)
-        ax.text(0.1, 0.5, f"Crashes: {crashes}", transform=ax.transAxes)
-        ax.text(0.1, 0.4, f"IDs: {ids}", transform=ax.transAxes)
+        ax.text(0.1, 0.9, f"Accelerations: {dis(adata)}", transform=ax.transAxes)
+        ax.text(0.1, 0.8, f"Velocities   : {dis(vdata)}", transform=ax.transAxes)
+        ax.text(0.1, 0.7, f"Positions    : {dis(xdata)}", transform=ax.transAxes)
+        ax.text(0.1, 0.6, f"Times        : {dis(tdata)}", transform=ax.transAxes)
+        ax.text(0.1, 0.5, f"Crashes      : {crashes}", transform=ax.transAxes)
+        ax.text(0.1, 0.4, f"Stopped      : {stopped}", transform=ax.transAxes)
+        ax.text(0.1, 0.3, f"IDs          : {ids}", transform=ax.transAxes)
 
         # Plot Frame number
         ax.text(0.02, 0.9, f"Frame: {frame}", transform=ax.transAxes)
@@ -203,9 +206,6 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
             # txt.set_fontsize(10)
 
         return artists
-
-
-    
 
     # ani = animation.FuncAnimation(
     #     fig, update, frames=FRAMES, init_func=init, blit=True, interval=INTERVAL
@@ -224,7 +224,6 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
         fps=FPS,
         extra_args=["-vcodec", "libx264", "-pix_fmt", "yuv420p"],
     )
-
 
     # ax.set_xlim(0, 1000)
     # plt.show()

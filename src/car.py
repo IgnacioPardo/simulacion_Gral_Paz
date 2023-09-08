@@ -1,5 +1,6 @@
-from random import randint
 from typing import Optional
+
+import numpy as np
 
 
 class Car:
@@ -9,14 +10,17 @@ class Car:
         v: float,
         vmax: float,
         a: float,
-        l: float,
+        amax: float,
+        length: float,
         tr: float,
         vd: float,
         bc: "Car",
         fc: Optional["Car"] = None,
         will_measure: Optional[bool] = False,
+        init_frame: Optional[int] = None,
+        car_id: Optional[int] = None,
     ):
-        self.id = id(self)
+        self.id = np.random.randint(0, 1000000) if car_id is None else car_id
 
         self.t = 0
 
@@ -35,7 +39,12 @@ class Car:
         self.vmax = vmax
 
         self.a = a
-        self.length = l
+        self.amax = amax
+
+        self.throttle_acc = 0.1
+        self.stopping_acc = 0.5
+
+        self.length = length
 
         self.reaction_time = tr
         self.desired_velocity = vd
@@ -47,6 +56,10 @@ class Car:
 
         self.crashed = False
 
+        self.init_frame = init_frame
+
+        self.action_queue = []
+
     def __str__(self):
         return f"Car(x={self.x}, v={self.v}, vmax={self.vmax}, a={self.a}, l={self.length}, tr={self.reaction_time}, vd={self.desired_velocity}, fc={self.f_car}, bc={self.b_car})"
 
@@ -54,89 +67,145 @@ class Car:
         return f"Car(x={self.x}, v={self.v}, vmax={self.vmax}, a={self.a}, l={self.length}, tr={self.reaction_time}, vd={self.desired_velocity}, fc={self.f_car}, bc={self.b_car})"
 
     def check_crash(self):
-        if self.distance_to_front_car():
-            if self.distance_to_front_car() <= 0:
-                print("Crash!")
-                self.crashed = True
+        if not self.crashed and self.distance_to_front_car() and self.distance_to_front_car() <= 0:
+            print(f"Car {self.id} crashed at frame {self.t} in position {self.x} to car {self.f_car.id}")
+            self.crashed = True
 
     def check_rear_end(self):
-        if self.distance_to_front_car():
-            if self.distance_to_back_car() <= 0:
-                print("Rear end!")
-                self.crashed = True
+        if not self.crashed and self.distance_to_back_car() and self.distance_to_back_car() <= 0:
+            print(f"Car {self.id} rear-ended at frame {self.t} in position {self.x}")
+            self.crashed = True
 
     def collides(self):
         return self.crashed
 
     def accelerate(self):
-        if self.v < self.vmax:
-            self.v = self.v + self.a
-        else:
-            self.v = self.vmax
-
-        if self.v < 0:
-            self.v = 0
-
-        # if self.b_car is not None:
-        #     if self.b_car.x - self.x < self.v:
-        #         self.v = self.b_car.x - self.x
+        if self.a < 0:
+            self.a = 0
+        self.a += self.throttle_acc
+        if self.a > self.amax:
+            self.a = self.amax
 
     def decelerate(self):
-        if self.f_car is not None:
-            if self.f_car.x - self.x < self.v:
-                self.v = self.f_car.x - self.x
+        self.a -= self.throttle_acc
+
+    def stop(self):
+        # self.a = -self.stopping_acc * self.v
+        self.a = 0
+        self.v = 0
+
 
     def keep_velocity(self):
         pass
 
-    def distance_to_front_car(self):
+    def distance_to_front_car(self) -> Optional[float]:
+        """ Calculates the distance to the front car
+
+
+        Returns:
+            float: Front Car X - Car X
+        """
         if self.f_car is not None:
             return self.f_car.x - self.x
         else:
             return None
 
-    def distance_to_back_car(self):
-        if self.bc is not None:
-            return self.x - self.bc.x
+    def distance_to_back_car(self) -> Optional[float]:
+        """ Calculates the distance to the back car
+
+
+        Returns:
+            float: Car X - Back Car X
+        """
+        if self.b_car is not None:
+            return self.x - self.b_car.x
         else:
             return None
-
-    def move(self):
-        self.x = self.x + self.v
 
     def get_position(self):
         return self.x
 
     def custom_behavior(self):
-        # if self.x > 300 and self.x < 1000:
-        #    self.v = 40
-
-        # random behavior
-        if randint(0, 100) < 5:
-            if self.v > 0:
-                self.a = randint(0, self.a + 4)
-            else:
-                self.v += randint(0, 10)
+        pass
 
     def dead_stop(self):
-        if self.v > 0:
-            if self.v > 10:
-                self.v -= 10
-            else:
-                self.v = 0
+        self.v = 0
+        self.a = 0
 
-    def update(self):
+    def set_initial_frame(self, frame: int):
+        self.init_frame = frame
 
-        if not self.crashed:
-            self.check_crash()
+    def get_initial_frame(self):
+        return self.init_frame
 
-            self.custom_behavior()
-            self.accelerate()
-            self.decelerate()
-            self.keep_velocity()
-            self.move()
+    def update(self, frame: int):
+
+        self.check_crash()
+        self.check_rear_end()
+
+        if self.collides():
+            self.dead_stop()
+            self.action_queue = []
 
         else:
-            self.dead_stop()
+            # Update position
+            self.x = self.x + self.v * 0.01
+
+            # Update velocity
+            self.v = self.v + self.a * 0.01
+
+            if self.v > self.vmax:
+                self.v = self.vmax
+
+            if self.v < 0:
+                self.v = 0
+
+            # Decision making
+
+            # Queue actions to be taken in (frame + reaction_time)
+            # Crashing does not take into account reaction time
+            
+            # With a ceartain probability, the car will stop
+
+            if np.random.uniform() < 0.01:
+                self.stop()
+
+            if self.v < self.desired_velocity:
+                if (self.f_car is not None):
+
+                    # If front car has crashed, stop
+                    if self.f_car.collides():
+                        self.action_queue.append(
+                            (self.stop, frame + self.reaction_time)
+                        )
+
+                    elif (self.distance_to_front_car() <= self.v):
+
+                        self.action_queue.append(
+                            (self.stop, frame + self.reaction_time)
+                        )
+                    elif (self.distance_to_front_car() <= 2 * self.v):
+                        # LEQ Two seconds of distance: Decelerate
+                        self.action_queue.append(
+                            (self.decelerate, frame + self.reaction_time)
+                        )
+                    else:
+                        self.action_queue.append(
+                            (self.accelerate, frame + self.reaction_time)
+                        )
+            else:
+                self.action_queue.append(
+                    (self.keep_velocity, frame + self.reaction_time)
+                )
+
+            # Take actions
+            for action, action_frame in self.action_queue:
+                if frame <= action_frame:
+                    action()
+
+            # Remove actions that have been taken
+            self.action_queue = [
+                action for action in self.action_queue if action[1] >= frame
+            ]
 
         self.t += 1

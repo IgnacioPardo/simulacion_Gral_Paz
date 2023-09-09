@@ -8,7 +8,7 @@ class Highway:
         self.time = 0
 
         self.crashes = []
-        self.crash_remove_delay = 5000
+        self.crash_remove_delay = 10000
         self.historic_ids = []
 
     def __str__(self):

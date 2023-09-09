@@ -7,6 +7,7 @@ from matplotlib import animation, pyplot as plt
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 
 import numpy as np
+
 # import cv2
 
 from tqdm import tqdm
@@ -29,6 +30,10 @@ PRECISION = 100
 FRAMES = 12000
 INTERVAL = 0
 FPS = 30
+
+SHORT_SCALE = False
+
+LIVE = False
 
 with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
 
@@ -58,7 +63,7 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
     fig.tight_layout()
 
     ax.set_xlim(0, agp.length)
-    ax.set_ylim(-3, 13)
+    ax.set_ylim(-3, 15)
 
     # ax hide y axis
     ax.set_yticks([])
@@ -101,33 +106,27 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
 
         pbar.update(1)
         # Once per frame
-        # One frame is one second
+        # One frame is 1 second
+        # In each frame the AGP is updated PRECISION times
+        # The AGP updates faster than the animation
 
         # Delete previous rendered cars
         for artist in ax.artists:
             artist.remove()
 
         # Clear previous text
-        # ax.texts = [] AttributeError: can't set attribute
-        # fix
         for txt in ax.texts:
-            # txt.set_visible(False)
             txt.remove()
 
         for sub_t in range(PRECISION):
             status = agp.update(frame * PRECISION + sub_t)
 
-        # if frame % 10 == 0:
-        #    agp.tow_cars(now=True)
-
-        # if len(agp.get_cars()) < 5:
-        # if np.random.uniform() < 0.1:
-        if agp.get_back_car().get_position() > agp.length / np.random.normal(40, 2):
-
+        # if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 10):
+        if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 100) and (np.random.poisson(1) == 1):
             agp.add_car(
                 Car(
                     x=None,
-                    v=int(np.random.uniform(40, 80)),
+                    v=int(np.random.uniform(50, 80)),
                     vmax=int(np.random.normal(120, 10)),
                     a=max(0, int(np.random.normal(2, 1))),
                     amax=np.random.uniform(1.5, 3),
@@ -138,12 +137,14 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
                     #   Variance:  0.026653888888888883
                     #   Standard Deviation:  0.16326018770321465
                     #   Skewness:  -0.040838018027236994
-                    tr=np.random.normal(0.7316666666666668, 0.16326018770321465),
+                    # tr=np.random.normal(0.732, 0.163),
+                    # tr=np.random.normal(0.9, 0.2),
+                    # tr=0.44,
+                    tr=10,
                     vd=int(np.random.normal(100, 5)),
                     fc=None,
                     bc=None,
                     will_measure=True,
-                    car_id=np.random.randint(0, 1000000),
                 )
             )
 
@@ -155,6 +156,10 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
         artists = []
 
         for car in agp.get_cars()[::-1]:
+
+            if frame > 23000 and frame < 30000:
+                if np.random.uniform() < 0.1:
+                    car.crashed = True
 
             x = car.get_position()
             # v = car.v
@@ -200,6 +205,9 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
         # Plot Frame number
         ax.text(0.02, 0.9, f"Frame: {frame}", transform=ax.transAxes)
 
+        # Plot ammount of cars
+        ax.text(0.02, 0.8, f"Cars: {len(agp.get_cars())}", transform=ax.transAxes)
+
         # Set font family and font size
         for txt in ax.texts:
             txt.set_fontfamily("monospace")
@@ -215,15 +223,24 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
     #     "animation.mp4", fps=FPS, extra_args=["-vcodec", "libx264", "-pix_fmt", "yuv420p"]
     # )
 
-    ani = animation.FuncAnimation(
-        fig, update, frames=FRAMES, init_func=init, blit=True, interval=INTERVAL
-    )
+    if SHORT_SCALE:
+        ax.set_xlim(1000, 1200)
+        FPS = 5
 
-    ani.save(
-        "animation.mp4",
-        fps=FPS,
-        extra_args=["-vcodec", "libx264", "-pix_fmt", "yuv420p"],
-    )
+    if LIVE:
+        ani = animation.FuncAnimation(
+            fig, update, frames=FRAMES, init_func=init, blit=True, interval=1
+        )
+        plt.show()
 
-    # ax.set_xlim(0, 1000)
-    # plt.show()
+    else:
+
+        ani = animation.FuncAnimation(
+            fig, update, frames=FRAMES, init_func=init, blit=True, interval=INTERVAL
+        )
+
+        ani.save(
+            "animation.mp4",
+            fps=FPS,
+            extra_args=["-vcodec", "libx264", "-pix_fmt", "yuv420p"],
+        )

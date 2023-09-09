@@ -2,6 +2,8 @@ from typing import Optional
 
 import numpy as np
 
+PRECISION = 100
+
 
 class Car:
     def __init__(
@@ -63,6 +65,7 @@ class Car:
         self.highway = None
 
         self.increased_attention = False
+        self.decresed_attention = False
 
         self.stopping = False
 
@@ -92,7 +95,7 @@ class Car:
             print(f"Car {self.id} rear-ended at frame {self.t} in position {self.x}")
             self.crashed = True
 
-    def collides(self):
+    def has_collided(self):
         return self.crashed
 
     def accelerate(self):
@@ -104,6 +107,8 @@ class Car:
 
     def decelerate(self):
         self.a -= self.throttle_acc
+        if self.a < -9.81:
+            self.a = -9.81
 
     def stop(self):
         self.stopping = True
@@ -119,7 +124,7 @@ class Car:
             float: Front Car X - Car X
         """
         if self.f_car is not None:
-            return self.f_car.x - self.x
+            return self.f_car.x - (self.x + self.length)
         else:
             return None
 
@@ -131,15 +136,12 @@ class Car:
             float: Car X - Back Car X
         """
         if self.b_car is not None:
-            return self.x - self.b_car.x
+            return self.x - (self.b_car.x + self.b_car.length)
         else:
             return None
 
     def get_position(self):
         return self.x
-
-    def custom_behavior(self):
-        pass
 
     def dead_stop(self):
         self.v = 0
@@ -159,52 +161,61 @@ class Car:
         self.check_crash()
         self.check_rear_end()
 
-        if self.collides():
+        if self.has_collided():
             self.dead_stop()
             self.action_queue = []
 
         else:
 
-            if self.stopping:
-                self.v = max(0, self.v - self.stopping_acc)
-            else:
-                # Update position
-                self.x = self.x + self.v * 0.01
+            # Update position
 
-                # Update velocity
-                self.v = self.v + self.a * 0.01
+            self.x = self.x + self.v / PRECISION
+
+            # Update velocity
+            self.v = self.v + self.a / PRECISION
+
+            if self.stopping:
+                self.v -= self.stopping_acc
 
             if self.v > self.vmax:
                 self.v = self.vmax
 
-            if self.v < 0:
-                self.v = 0
-                self.stopping = False
+            self.v = max(0, self.v)
 
+            if self.v == 0:
+                self.stopping = False
             # Decision making
 
             # Queue actions to be taken in (frame + reaction_time)
-            # Crashing does not take into account reaction time
+            # Crashing does not take into account reaction time, its immediate
 
-            # With a ceartain probability, the car will stop
+            if np.random.uniform() < 0.1:
+                self.decresed_attention = True
+
+            self.custom_behavior()
 
             self.behaviour(frame)
 
-            # Take actions
+            # Resolve actions in the current frame
             self.resolve_actions(frame)
 
         self.t += 1
 
     def resolve_actions(self, frame):
-        if frame % 100 == 0:
-            for action, action_frame in self.action_queue:
-                if frame <= action_frame:
+        for action, action_frame in self.action_queue:
+            # print(f"Car {self.id} took action {action.__name__} at frame {frame}")
+            if frame <= action_frame:
+                p = np.random.uniform()
+                if p < 0.1:
+                    for _ in range(100):
+                        action()
+                if p < 0.07:
                     action()
 
-            # Remove actions that have been taken
-            self.action_queue = [
-                action for action in self.action_queue if action[1] >= frame
-            ]
+        # Remove actions that have been taken
+        self.action_queue = [
+            action_pair for action_pair in self.action_queue if action_pair[1] >= frame
+        ]
 
     def increase_attention(self):
         self.increased_attention = True
@@ -215,60 +226,84 @@ class Car:
     def get_reaction_time(self):
         if self.increased_attention:
             return self.reaction_time / 2
-        else:
-            return self.reaction_time
+        elif self.decresed_attention:
+            return self.reaction_time * 1.5
+        return self.reaction_time
 
-    def behaviour(self, frame):
-        # If there are cars in front of me, I will slow down
-        # if self.f_car is not None and self.f_car.collides():
-        # if self.highway.has_crashes():
-        front_crash = False
+    def crashes_upfront(self):
         if self.highway:
             for car in self.highway.get_cars():
                 if car.x > self.x and car.collides():
-                    front_crash = True
-                    break
+                    return True
+        return False
 
-        if front_crash:
+    def custom_behavior(self):
+        if self.x > 8000 and self.x < 9000 and np.random.poisson(10) == 1:
+            # self.crashed = True
+            self.v = 10000
+
+    def behaviour(self, frame):
+        # If there are cars in front of me, I will slow down
+        if self.crashes_upfront():
             if not self.increased_attention:
                 self.action_queue.append((self.increase_attention, frame + 1))
-            self.action_queue.append(
-                (self.decelerate, frame + self.get_reaction_time())
-            )
-        else:
-            self.action_queue.append((self.default_attention, frame + 1))
-            self.action_queue.append(
-                (self.keep_velocity, frame + self.get_reaction_time())
-            )
-            
-        if self.f_car is not None:
-            if self.f_car.a < 0:
-                # If the front car is braking, I will brake
+
+            if self.v > 0:
                 self.action_queue.append(
                     (self.decelerate, frame + self.get_reaction_time())
                 )
+        else:
+            if self.increased_attention:
+                self.action_queue.append((self.default_attention, frame + 1))
 
-        if self.v < self.desired_velocity:
-            if self.f_car is not None:
+        if self.f_car is not None and self.f_car.a < 0 and self.v > 0:
+            # If the front car is braking, I will brake
+            self.action_queue.append(
+                (self.decelerate, frame + self.get_reaction_time())
+            )
+
+        if self.f_car is not None:
+            if self.v < self.desired_velocity:
                 # If front car has crashed, stop
-                if self.f_car.collides() or self.distance_to_front_car() <= self.v:
+                if self.f_car.has_collided():
                     self.action_queue.append(
                         (self.stop, frame + self.get_reaction_time())
+                    )
+
+                    self.action_queue.append(
+                        (self.decelerate, frame + self.get_reaction_time())
                     )
                 elif self.distance_to_front_car() <= 5 * self.v:
                     # LEQ Two seconds of distance: Decelerate
                     self.action_queue.append(
                         (self.decelerate, frame + self.get_reaction_time())
                     )
-                else:
+                elif self.v < self.f_car.v:
                     self.action_queue.append(
                         (self.accelerate, frame + self.get_reaction_time())
                     )
             else:
+                # If front car has crashed, stop
+                if self.f_car.has_collided():
+                    # self.action_queue.append(
+                        # (self.stop, frame + self.get_reaction_time())
+                    # )
+                    if self.distance_to_front_car() <= self.a / 2:
+                        self.action_queue.append(
+                            (self.decelerate, frame + self.get_reaction_time())
+                        )
+                    else:
+                        self.action_queue.append(
+                            (self.keep_velocity, frame + self.get_reaction_time())
+                        )
+
+                elif self.distance_to_front_car() <= 5 * self.v:
+                    # LEQ Two seconds of distance: Decelerate
+                    self.action_queue.append(
+                        (self.decelerate, frame + self.get_reaction_time())
+                    )
+        else:
+            if self.v < self.desired_velocity:
                 self.action_queue.append(
                     (self.accelerate, frame + self.get_reaction_time())
                 )
-        else:
-            self.action_queue.append(
-                (self.keep_velocity, frame + self.get_reaction_time())
-            )

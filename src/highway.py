@@ -9,6 +9,7 @@ class Highway:
 
         self.crashes = []
         self.crash_remove_delay = 5000
+        self.historic_ids = []
 
     def __str__(self):
         return (
@@ -25,18 +26,30 @@ class Highway:
         )
 
     def get_front_car(self):
+        if len(self.cars) == 0:
+            return None
         return self.cars[-1]
 
     def get_back_car(self):
+        if len(self.cars) == 0:
+            return None
         return self.cars[0]
 
     def add_car(self, car: Car):
 
+        if not car.id:
+            car.id = len(self.historic_ids)
+            self.historic_ids.append(car.id)
+        if car.id and car.id not in self.historic_ids:
+            self.historic_ids.append(car.id)
+
         if car.get_position() is None:
             car.x = 0
             self.cars = [car] + self.cars
-            self.cars[1].b_car = car
-            self.cars[0].f_car = self.cars[1]
+
+            if len(self.cars) > 1:
+                self.cars[1].b_car = car
+                self.cars[0].f_car = self.cars[1]
             return
 
         if car.get_position() == 0:
@@ -61,6 +74,12 @@ class Highway:
     def remove_car(self, car: Car):
         if car in self.cars:
             print(f"AGP: Removing car {car.id} from highway at frame {self.time}")
+            # Remove references to car
+            if car.f_car:
+                car.f_car.b_car = car.b_car
+            if car.b_car:
+                car.b_car.f_car = car.f_car
+            
             self.cars.remove(car)
 
     def tow_cars(self, now: bool = False):

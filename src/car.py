@@ -279,17 +279,17 @@ class Car:
             # )
             None
 
-        if self.f_car is not None:
-            if self.v < self.desired_velocity:
-                # If front car has crashed, stop
+        if self.v < self.desired_velocity:
+            if self.f_car is not None:
                 if self.f_car.has_collided():
-                    self.action_queue.append(
-                        (self.stop, frame + self.get_reaction_time())
-                    )
-
-                    # self.action_queue.append(
-                    # (self.decelerate, frame + self.get_reaction_time())
-                    # )
+                    if self.distance_to_front_car() <= 0.5 * self.v:
+                        self.action_queue.append(
+                            (self.decelerate, frame + self.get_reaction_time())
+                        )
+                    else:
+                        self.action_queue.append(
+                            (self.keep_velocity, frame + self.get_reaction_time())
+                        )
                 elif self.distance_to_front_car() <= 5 * self.v:
                     # LEQ Two seconds of distance: Decelerate
                     self.action_queue.append(
@@ -300,24 +300,6 @@ class Car:
                         (self.accelerate, frame + self.get_reaction_time())
                     )
             else:
-                # If front car has crashed, stop
-                if self.f_car.has_collided():
-                    if self.distance_to_front_car() <= 0.5 * self.v:
-                        self.action_queue.append(
-                            (self.decelerate, frame + self.get_reaction_time())
-                        )
-                    else:
-                        self.action_queue.append(
-                            (self.keep_velocity, frame + self.get_reaction_time())
-                        )
-
-                elif self.distance_to_front_car() <= 5 * self.v:
-                    # LEQ Two seconds of distance: Decelerate
-                    self.action_queue.append(
-                        (self.decelerate, frame + self.get_reaction_time())
-                    )
-        else:
-            if self.v < self.desired_velocity:
                 self.action_queue.append(
                     (self.accelerate, frame + self.get_reaction_time())
                 )

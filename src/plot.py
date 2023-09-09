@@ -43,14 +43,14 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
 
     agp.add_car(
         Car(
-            x=0,
-            v=0,
-            vmax=120,
-            a=2,
-            amax=2,
-            length=5,
-            tr=1,
-            vd=120,
+            x=100,
+            v=int(np.random.uniform(50, 80)),
+            vmax=int(np.random.normal(120, 10)),
+            a=max(0, int(np.random.normal(2, 1))),
+            amax=np.random.uniform(1.5, 3),
+            length=1.5,
+            tr=np.random.normal(0.732, 0.163),
+            vd=int(np.random.normal(100, 5)),
             fc=None,
             bc=None,
             will_measure=True,
@@ -122,7 +122,8 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
             status = agp.update(frame * PRECISION + sub_t)
 
         # if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 10):
-        if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 100) and (np.random.poisson(1) == 1):
+        # if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 100) and (np.random.poisson() == 1):
+        if len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 80:
             agp.add_car(
                 Car(
                     x=None,
@@ -137,10 +138,10 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
                     #   Variance:  0.026653888888888883
                     #   Standard Deviation:  0.16326018770321465
                     #   Skewness:  -0.040838018027236994
-                    # tr=np.random.normal(0.732, 0.163),
+                    tr=np.random.normal(0.732, 0.163),
                     # tr=np.random.normal(0.9, 0.2),
                     # tr=0.44,
-                    tr=10,
+                    # tr=10,
                     vd=int(np.random.normal(100, 5)),
                     fc=None,
                     bc=None,

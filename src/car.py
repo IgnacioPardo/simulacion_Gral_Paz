@@ -24,7 +24,7 @@ class Car:
     ):
         self.id = np.random.randint(0, 1000000) if car_id is None else car_id
 
-        self.t = 0
+        self.time_ellapsed = 0
 
         # Internally, we use SI units
         # Position in meters
@@ -95,7 +95,7 @@ class Car:
             and self.distance_to_front_car() <= 0
         ):
             print(
-                f"Car {self.id} crashed at frame {self.t} in position {self.x} to car {self.f_car.id}"
+                f"Car {self.id} crashed at frame {self.time_ellapsed} in position {self.x} to car {self.f_car.id}"
             )
             self.crashed = True
 
@@ -105,7 +105,9 @@ class Car:
             and self.distance_to_back_car()
             and self.distance_to_back_car() <= 0
         ):
-            print(f"Car {self.id} rear-ended at frame {self.t} in position {self.x}")
+            print(
+                f"Car {self.id} rear-ended at frame {self.time_ellapsed} in position {self.x}"
+            )
             self.crashed = True
 
     def has_collided(self):
@@ -220,7 +222,7 @@ class Car:
         # Resolve actions in the current frame
         self.resolve_actions(frame)
 
-        self.t += 1
+        self.time_ellapsed += 1
 
     def resolve_actions(self, frame):
         for action, action_frame in self.action_queue:
@@ -332,7 +334,9 @@ class Car:
 
         # If the front car seems to be decelerating, I will decelerate
         # A car should not know exactly the acceleration of the front car
-        if self.f_car is not None and self.f_car.a < np.random.normal(0, 0.1 - 0.05 * self.increased_attention + 0.5 * self.decresed_attention):
+        if self.f_car is not None and self.f_car.a < np.random.normal(
+            0, 0.1 - 0.05 * self.increased_attention + 0.5 * self.decresed_attention
+        ):
             self.action_queue.append(
                 (self.decelerate, frame + self.get_reaction_time())
             )
@@ -356,8 +360,15 @@ class Car:
                     self.action_queue.append(
                         (self.decelerate, frame + self.get_reaction_time())
                     )
-                elif (self.v < self.f_car.v + np.random.uniform(0, 5 - 2 * self.increased_attention + 2 * self.decresed_attention)
-                        and self.v < self.desired_velocity):
+                elif (
+                    self.v
+                    < self.f_car.v
+                    + np.random.uniform(
+                        0,
+                        5 - 2 * self.increased_attention + 2 * self.decresed_attention,
+                    )
+                    and self.v < self.desired_velocity
+                ):
                     # Same as the acceleration of the front car
                     # A car should not know exactly the velocity of the front car
                     # Error factor as to simulate an approximation

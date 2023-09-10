@@ -1,14 +1,17 @@
 from car import Car
 from highway import Highway
 
-# from utils import rotate_bound
-
 from matplotlib import animation, pyplot as plt
 from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 
 import numpy as np
+import pandas as pd
+
+import os
+from datetime import datetime
 
 # import cv2
+# from utils import rotate_bound
 
 from tqdm import tqdm
 
@@ -18,8 +21,6 @@ random.seed(42)
 
 np.random.seed(42)
 
-
-# Pass tqdm to update function animation
 
 # Interval (Delay between frames in milliseconds) = 0
 # FPS = 30
@@ -31,12 +32,81 @@ FRAMES = 12000
 INTERVAL = 0
 FPS = 30
 
-SHORT_SCALE = False
-
-LIVE = False
+# Simulated Time = Frames (s)
 
 HIGHWAY_LENGTH = 14 * 1000
 MAX_V = 100  # km/h => Converts to m/s
+
+PLOT = False
+
+LIVE = False and PLOT
+SHORT_SCALE = False and PLOT
+
+LOG = True
+AGP_LOG_FILE = f"logs/{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_agp_data.csv"
+CARS_LOG_FILE = f"logs/{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_cars_data.csv"
+
+if LOG:
+
+    # Check if log directory exists
+
+    if not os.path.exists("logs"):
+        os.makedirs("logs")
+
+    agp_df = pd.DataFrame(
+        columns=[
+            "frame",
+            "current_car_count",
+            "historic_car_count",
+            "current_crash_count",
+            "historic_crash_count",
+            "avg_v",
+            "avg_a",
+            "avg_t_d",
+        ]
+    )
+
+    times_df = pd.DataFrame(
+        columns=[
+            "frame",
+            "car_id",
+            "avg_car_v",
+            "avg_car_a",
+            "car_t_d",
+        ]
+    )
+
+    crashes_df = pd.DataFrame(
+        columns=[
+            "frame",
+            "car_id",
+            "car_v",
+            "car_a",
+            "car_t_d",
+        ]
+    )
+
+    def log_agp_data(agp: Highway, frame: int):
+        agp_df.loc[frame] = [
+            frame,
+            len(agp.get_cars()),
+            len(agp.historic_ids),
+            agp.get_crash_count(),
+            agp.historic_crash_count,
+            agp.get_avg_v(),
+            agp.get_avg_a(),
+            agp.get_avg_trip_duration(),
+        ]
+
+    def log_car_data(car: Car, frame: int):
+        times_df.loc[len(times_df)] = [
+            frame,
+            car.id,
+            np.mean(car.historic_velocities) if len(car.historic_velocities) > 0 else 0,
+            np.mean(car.historic_accelerations) if len(car.historic_accelerations) > 0 else 0,
+            car.time_ellapsed / PRECISION,
+        ]
+
 
 car_colors = ["car_b", "car_y", "car_k", "car_w", "car_g", "car_o", "car_p", "car_v"]
 
@@ -63,46 +133,48 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
         )
     )
 
-    fig, ax = plt.subplots(figsize=(22, 2))
+    if PLOT:
+        # Create figure and axes
+        fig, ax = plt.subplots(figsize=(22, 2))
 
-    # tight_layout makes sure the axis and title are not cropped
-    fig.tight_layout()
+        # tight_layout makes sure the axis and title are not cropped
+        fig.tight_layout()
 
-    ax.set_xlim(0, agp.length)
-    ax.set_ylim(-3, 20)
+        ax.set_xlim(0, agp.length)
+        ax.set_ylim(-3, 20)
 
-    # ax hide y axis
-    ax.set_yticks([])
+        # ax hide y axis
+        ax.set_yticks([])
 
-    # Hide the right and top spines
-    # ax.spines['left'].set_visible(False)
-    # ax.spines['top'].set_visible(False)
-    # ax.spines['bottom'].set_visible(False)
+        # Hide the right and top spines
+        # ax.spines['left'].set_visible(False)
+        # ax.spines['top'].set_visible(False)
+        # ax.spines['bottom'].set_visible(False)
 
-    lw = 4
-    # Plot lane lines
-    ax.plot([2, agp.length], [lw / 2, lw / 2], color="black", linewidth=2)
-    ax.plot([2, agp.length], [-lw / 2, -lw / 2], color="black", linewidth=2)
+        lw = 4
+        # Plot lane lines
+        ax.plot([2, agp.length], [lw / 2, lw / 2], color="black", linewidth=2)
+        ax.plot([2, agp.length], [-lw / 2, -lw / 2], color="black", linewidth=2)
 
-    # Plot asphalt area
-    ax.fill_between(
-        [2, agp.length], [-lw / 2, -lw / 2], [lw / 2, lw / 2], color="lightgrey"
-    )
+        # Plot asphalt area
+        ax.fill_between(
+            [2, agp.length], [-lw / 2, -lw / 2], [lw / 2, lw / 2], color="lightgrey"
+        )
 
-    # Plot dashed center line
-    ax.plot(
-        [2, agp.length],
-        [0, 0],
-        color="white",
-        linewidth=2,
-        linestyle="dashed",
-        dashes=(5, 5),
-    )
+        # Plot dashed center line
+        ax.plot(
+            [2, agp.length],
+            [0, 0],
+            color="white",
+            linewidth=2,
+            linestyle="dashed",
+            dashes=(5, 5),
+        )
 
-    car_ims = [
-        OffsetImage(plt.imread(f"assets/{car_color}.png", format="png"), zoom=0.4)
-        for car_color in car_colors
-    ]
+        car_ims = [
+            OffsetImage(plt.imread(f"assets/{car_color}.png", format="png"), zoom=0.4)
+            for car_color in car_colors
+        ]
 
     def init():
         # Animate with AnnotationBbox for each car
@@ -111,23 +183,17 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
     def update(frame):
 
         pbar.update(1)
-        pbar.set_postfix(cars=f"{len(agp.get_cars())}")
 
         # Once per frame
         # One frame is 1 second
         # In each frame the AGP is updated PRECISION times
         # The AGP updates faster than the animation
 
-        # Delete previous rendered cars
-        for artist in ax.artists:
-            artist.remove()
-
-        # Clear previous text
-        for txt in ax.texts:
-            txt.remove()
-
+        # Update AGP PRECISION times each frame
         for sub_t in range(PRECISION):
-            status = agp.update(frame * PRECISION + sub_t)
+            agp.update(frame * PRECISION + sub_t)
+
+        # Add cars to the AGP
 
         # if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 10):
         # if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 100) and (np.random.poisson() == 1):
@@ -157,132 +223,232 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
                 )
             )
 
-        if not status:
-            # Stop animation
-            # return []
-            pass
+        # Log AGP current data
+        if LOG:
+            log_agp_data(agp, frame)
+            for car in agp.get_cars():
+                log_car_data(car, frame)
 
-        artists = []
+        if PLOT:
 
-        for car in agp.get_cars()[::-1]:
+            # Gather AGP current data
+            xdata = agp.get_cars_positions()
+            vdata = agp.get_cars_velocities()
+            adata = agp.get_cars_accelerations()
+            tdata = agp.get_cars_times()
+            crashes = [1 if car.crashed else 0 for car in agp.get_cars()]
+            stopped = [1 if car.stopping else 0 for car in agp.get_cars()]
+            ids = [car.id for car in agp.get_cars()]
+            # car_count = len(agp.get_cars())
+            # historic_car_count = len(agp.historic_ids)
 
-            if frame > 23000 and frame < 30000:
-                if np.random.uniform() < 0.1:
-                    car.crashed = True
+            dis = lambda x: list(
+                map(lambda x: " " * (6 - len(f"{x:.2f}")) + f"{x:.2f}", x)
+            )
 
-            x = car.get_position()
-            # v = car.v
+            # Delete previous rendered cars
+            for artist in ax.artists:
+                artist.remove()
 
-            # car_color = car_colors[car.id % len(car_colors)]
-            # if car.crashed:
-            #   car_color = 'car_r'
+            # Clear previous text
+            for txt in ax.texts:
+                txt.remove()
 
-            car_color = "car_r" if car.crashed else car_colors[car.id % len(car_colors)]
+            artists = []
 
-            # car_im = #cv2.imread(f'assets/{car_color}.png', cv2.IMREAD_UNCHANGED)
-            car_im = plt.imread(f"assets/{car_color}.png", format="png")
+            # Plot each car
+            for car in agp.get_cars()[::-1]:
 
-            # Drift: sacar
-            # if v > 140:
-            #   angle = -20 * np.sin(2 * np.pi * frame / 100)
-            #   car_im = rotate_bound(car_im, angle)
+                x = car.get_position()
 
-            car_oi = OffsetImage(car_im, zoom=0.4)
-            ab = AnnotationBbox(car_oi, (x, 0), frameon=False)
+                car_color = (
+                    "car_r" if car.crashed else car_colors[car.id % len(car_colors)]
+                )
+                car_im = plt.imread(f"assets/{car_color}.png", format="png")
+                car_oi = OffsetImage(car_im, zoom=0.4)
+                ab = AnnotationBbox(car_oi, (x, 0), frameon=False)
+                artists.append(ax.add_artist(ab))
 
-            artists.append(ax.add_artist(ab))
+            # Plot Frame number
+            ax.text(
+                0.01,
+                0.9,
+                f"F:{frame}/{FRAMES}",
+                transform=ax.transAxes,
+                fontfamily="monospace",
+            )
+            # Plot ammount of cars
+            ax.text(
+                0.01,
+                0.8,
+                f"# Cars: {len(agp.get_cars())}",
+                transform=ax.transAxes,
+                fontfamily="monospace",
+            )
 
-        xdata = agp.get_cars_positions()
-        vdata = agp.get_cars_velocities()
-        adata = agp.get_cars_accelerations()
-        tdata = agp.get_cars_times()
-        crashes = [1 if car.crashed else 0 for car in agp.get_cars()]
-        stopped = [1 if car.stopping else 0 for car in agp.get_cars()]
-        ids = [car.id for car in agp.get_cars()]
+            # Plot crash count
+            ax.text(
+                0.01,
+                0.7,
+                f"# Crashes: {agp.get_crash_count()}",
+                transform=ax.transAxes,
+                fontfamily="monospace",
+            )
 
-        dis = lambda x: list(map(lambda x: " " * (6 - len(f"{x:.2f}")) + f"{x:.2f}", x))
+            # Plot Front Car Speed
+            ax.text(
+                0.01,
+                0.6,
+                f"F Car V: {agp.get_front_car().get_velocity()*3.6:.2f}",
+                transform=ax.transAxes,
+                fontfamily="monospace",
+            )
 
-        # Plot Frame number
-        ax.text(0.01, 0.9, f"F:{frame}/{FRAMES}", transform=ax.transAxes, fontfamily="monospace")
-        # Plot ammount of cars
-        ax.text(0.01, 0.8, f"# Cars: {len(agp.get_cars())}", transform=ax.transAxes, fontfamily="monospace")
+            # Plot car velocities and positions as text
+            ax.text(
+                0.15,
+                0.9,
+                f"Accelerations: {dis(adata[::-1])}",
+                transform=ax.transAxes,
+                fontfamily="monospace",
+            )
+            ax.text(
+                0.15,
+                0.8,
+                f"Velocities   : {list(map(lambda x: ' ' * (6 - len(f'{x*3.6:.2f}')) + f'{x*3.6:.2f}', vdata[::-1]))}",
+                transform=ax.transAxes,
+                fontfamily="monospace",
+            )
+            ax.text(
+                0.15,
+                0.7,
+                f"Times        : {dis(tdata[::-1])}",
+                transform=ax.transAxes,
+                fontfamily="monospace",
+            )
+            ax.text(
+                0.15,
+                0.6,
+                f"Positions    : {dis(xdata[::-1])}",
+                transform=ax.transAxes,
+                fontfamily="monospace",
+            )
+            ax.text(
+                0.15,
+                0.5,
+                f"Crashes      : {crashes[::-1]}",
+                transform=ax.transAxes,
+                fontfamily="monospace",
+            )
+            ax.text(
+                0.15,
+                0.4,
+                f"Stopped      : {stopped[::-1]}",
+                transform=ax.transAxes,
+                fontfamily="monospace",
+            )
+            ax.text(
+                0.15,
+                0.3,
+                f"IDs          : {ids[::-1]}",
+                transform=ax.transAxes,
+                fontfamily="monospace",
+            )
 
-        # Plot crash count
-        ax.text(0.01, 0.7, f"# Crashes: {agp.get_crash_count()}", transform=ax.transAxes, fontfamily="monospace")
+            # Plot Avg. Acceleration
+            ax.text(
+                0.07,
+                0.9,
+                f"Avg.Cur. A: {np.mean(adata):.2f}",
+                transform=ax.transAxes,
+                fontfamily="monospace",
+            )
+            # Plot Avg. Velocity
+            ax.text(
+                0.07,
+                0.8,
+                f"Avg.Cur. V: {np.mean(vdata)*3.6:.2f}",
+                transform=ax.transAxes,
+            )
+            # Plot Avg. Trip Duration
+            ax.text(
+                0.07,
+                0.7,
+                f"Avg.Cur. T: {np.mean(tdata):.2f}",
+                transform=ax.transAxes,
+                fontfamily="monospace",
+            )
 
-        # Plot Front Car Speed
-        ax.text(0.01, 0.6, f"F Car V: {agp.get_front_car().get_velocity()*3.6:.2f}", transform=ax.transAxes, fontfamily="monospace")
+            # Plot Avg. Acceleration
+            ax.text(
+                0.07,
+                0.5,
+                f"Avg.H. A: {agp.get_avg_a():.2f}",
+                transform=ax.transAxes,
+                fontfamily="monospace",
+            )
+            # Plot Avg. Velocity
+            ax.text(
+                0.07,
+                0.4,
+                f"Avg.H. V: {agp.get_avg_v()*3.6:.2f}",
+                transform=ax.transAxes,
+                fontfamily="monospace",
+            )
+            # Plot Avg. Trip Duration
+            ax.text(
+                0.07,
+                0.3,
+                f"Avg. Dur: {agp.get_avg_trip_duration():.2f}",
+                transform=ax.transAxes,
+                fontfamily="monospace",
+            )
 
-        # Plot car velocities and positions as text
-        ax.text(0.15, 0.9, f"Accelerations: {dis(adata[::-1])}", transform=ax.transAxes, fontfamily="monospace")
-        ax.text(
-            0.15,
-            0.8,
-            f"Velocities   : {list(map(lambda x: ' ' * (6 - len(f'{x*3.6:.2f}')) + f'{x*3.6:.2f}', vdata[::-1]))}",
-            transform=ax.transAxes,
+            return artists
+
+        pbar.set_postfix(
+            cars=f"{len(agp.get_cars())}",
+            crashes=f"{agp.get_crash_count()}",
+            all_cars=f"{len(agp.historic_ids)}",
+            avg_v=f"{agp.get_avg_v()*3.6:.2f}",
+            avg_a=f"{agp.get_avg_a():.2f}",
+            avg_t_d=f"{agp.get_avg_trip_duration():.2f}",
+            avg_h_v=f"{agp.get_avg_v()*3.6:.2f}",
+            avg_h_a=f"{agp.get_avg_a():.2f}",
+            avg_h_t_d=f"{agp.get_avg_trip_duration():.2f}",
         )
-        ax.text(0.15, 0.7, f"Times        : {dis(tdata[::-1])}", transform=ax.transAxes, fontfamily="monospace")
-        ax.text(0.15, 0.6, f"Positions    : {dis(xdata[::-1])}", transform=ax.transAxes, fontfamily="monospace")
-        ax.text(0.15, 0.5, f"Crashes      : {crashes[::-1]}", transform=ax.transAxes, fontfamily="monospace")
-        ax.text(0.15, 0.4, f"Stopped      : {stopped[::-1]}", transform=ax.transAxes, fontfamily="monospace")
-        ax.text(0.15, 0.3, f"IDs          : {ids[::-1]}", transform=ax.transAxes, fontfamily="monospace")
 
-        # Plot Avg. Acceleration
-        ax.text(0.07, 0.9, f"Avg.Cur. A: {np.mean(adata):.2f}", transform=ax.transAxes, fontfamily="monospace")
-        # Plot Avg. Velocity
-        ax.text(
-            0.07, 0.8, f"Avg.Cur. V: {np.mean(vdata)*3.6:.2f}", transform=ax.transAxes
-        )
-        # Plot Avg. Trip Duration
-        ax.text(0.07, 0.7, f"Avg.Cur. T: {np.mean(tdata):.2f}", transform=ax.transAxes, fontfamily="monospace")
+        return None
 
-        # Plot Avg. Acceleration
-        ax.text(0.07, 0.5, f"Avg.H. A: {agp.get_avg_a():.2f}", transform=ax.transAxes, fontfamily="monospace")
-        # Plot Avg. Velocity
-        ax.text(
-            0.07, 0.4, f"Avg.H. V: {agp.get_avg_v()*3.6:.2f}", transform=ax.transAxes
-        )
-        # Plot Avg. Trip Duration
-        ax.text(
-            0.07,
-            0.3,
-            f"Avg. Dur: {agp.get_avg_trip_duration():.2f}",
-            transform=ax.transAxes,
-        )
+    if PLOT:
 
-        # Set font family and font size
-        for txt in ax.texts:
-            txt.set_fontfamily("monospace")
-            # txt.set_fontsize(10)
+        if SHORT_SCALE:
+            ax.set_xlim(1000, 1200)
+            FPS = 5
 
-        return artists
+        if LIVE:
+            ani = animation.FuncAnimation(
+                fig, update, frames=FRAMES, init_func=init, blit=True, interval=1
+            )
+            plt.show()
 
-    # ani = animation.FuncAnimation(
-    #     fig, update, frames=FRAMES, init_func=init, blit=True, interval=INTERVAL
-    # )
+        else:
 
-    # ani.save(
-    #     "animation.mp4", fps=FPS, extra_args=["-vcodec", "libx264", "-pix_fmt", "yuv420p"]
-    # )
+            ani = animation.FuncAnimation(
+                fig, update, frames=FRAMES, init_func=init, blit=True, interval=INTERVAL
+            )
 
-    if SHORT_SCALE:
-        ax.set_xlim(1000, 1200)
-        FPS = 5
-
-    if LIVE:
-        ani = animation.FuncAnimation(
-            fig, update, frames=FRAMES, init_func=init, blit=True, interval=1
-        )
-        plt.show()
+            ani.save(
+                "animation.mp4",
+                fps=FPS,
+                extra_args=["-vcodec", "libx264", "-pix_fmt", "yuv420p"],
+            )
 
     else:
+        for frame in tqdm(range(FRAMES)):
+            update(frame)
 
-        ani = animation.FuncAnimation(
-            fig, update, frames=FRAMES, init_func=init, blit=True, interval=INTERVAL
-        )
-
-        ani.save(
-            "animation.mp4",
-            fps=FPS,
-            extra_args=["-vcodec", "libx264", "-pix_fmt", "yuv420p"],
-        )
+            if LOG and frame % 100 == 0:
+                # Save data to CSV
+                agp_df.to_csv(AGP_LOG_FILE)
+                times_df.to_csv(CARS_LOG_FILE)

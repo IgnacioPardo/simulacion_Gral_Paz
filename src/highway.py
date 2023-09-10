@@ -17,10 +17,6 @@ class Highway:
         self.historic_accelerations = []
         self.historic_trip_duration = []
 
-        # self.avg_v = 0
-        # self.avg_a = 0
-        # self.avg_trip_duration = 0
-
         self.historic_crash_count = 0
 
     def __len__(self):
@@ -43,6 +39,36 @@ class Highway:
         if len(self.historic_trip_duration) == 0:
             return 0
         return np.mean(self.historic_trip_duration)
+
+    def get_max_v(self):
+        if (len(self.historic_velocities)) == 0:
+            return 0
+        return np.max(self.historic_velocities)
+
+    def get_max_a(self):
+        if (len(self.historic_accelerations)) == 0:
+            return 0
+        return np.max(self.historic_accelerations)
+
+    def get_max_trip_duration(self):
+        if (len(self.historic_trip_duration)) == 0:
+            return 0
+        return np.max(self.historic_trip_duration)
+
+    def get_min_v(self):
+        if (len(self.historic_velocities)) == 0:
+            return 0
+        return np.min(self.historic_velocities)
+
+    def get_min_a(self):
+        if (len(self.historic_accelerations)) == 0:
+            return 0
+        return np.min(self.historic_accelerations)
+
+    def get_min_trip_duration(self):
+        if (len(self.historic_trip_duration)) == 0:
+            return 0
+        return np.min(self.historic_trip_duration)
 
     def __str__(self):
         return (
@@ -141,7 +167,7 @@ class Highway:
                 self.tow_cars()
 
             if car.get_position() > self.length:
-                self.historic_trip_duration.append(car.t)
+                self.historic_trip_duration.append(car.time_ellapsed)
                 self.remove_car(car)
 
             if len(self.cars) > 0:
@@ -182,7 +208,7 @@ class Highway:
         pass
 
     def get_cars_times(self):
-        return [car.t for car in self.cars]
+        return [car.time_ellapsed for car in self.cars]
 
     def get_cars_reaction_times(self):
         pass

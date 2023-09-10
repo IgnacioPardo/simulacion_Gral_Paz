@@ -297,7 +297,7 @@ class Car:
         # If i have a bunch of cars behind me
         # but not a close one in front of me
         # , I will increase my speed
-        if self.highway and np.random.uniform() < 0.1:
+        if self.highway and np.random.uniform() < 0.01:
             cars_close_behind = 0
             for car in self.highway.get_cars():
                 if car != self and car.x < self.x and car.x > self.x - 10 * self.v:

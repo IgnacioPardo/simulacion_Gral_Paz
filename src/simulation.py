@@ -52,7 +52,9 @@ parser.add_argument(
     "--max_v", type=int, help="Maximum velocity of the cars in km/h", default=100
 )
 parser.add_argument("--plot", type=bool, help="Plot the simulation", default=False)
-parser.add_argument("--text", type=bool, help="Plot text in the simulation", default=False)
+parser.add_argument(
+    "--text", type=bool, help="Plot text in the simulation", default=False
+)
 parser.add_argument("--live", type=bool, help="Plot the simulation live", default=False)
 parser.add_argument(
     "--short_scale",
@@ -107,7 +109,7 @@ if LOG:
     if not os.path.exists("logs"):
         os.makedirs("logs")
     if not os.path.exists(f"logs/{ts}"):
-       os.makedirs(f"logs/{ts}")
+        os.makedirs(f"logs/{ts}")
 
     agp_df = pd.DataFrame(
         columns=[
@@ -182,14 +184,29 @@ if LOG:
             car.b_car.id if car.b_car is not None else -1,
         ]
 
-    def log_exits(car: Car):
+    def log_exits(car: Car, frame: int):
         exits_df.loc[len(exits_df)] = [
             frame,
             car.id,
             np.mean(car.historic_velocities) if len(car.historic_velocities) > 0 else 0,
-            np.mean(car.historic_accelerations) if len(car.historic_accelerations) > 0 else 0,
+            np.mean(car.historic_accelerations)
+            if len(car.historic_accelerations) > 0
+            else 0,
             car.time_ellapsed / PRECISION,
         ]
+
+    def log_crash(car: Car, frame: int):
+        crashes_df.loc[len(crashes_df)] = [
+            frame,
+            car.id,
+            car.x,
+            car.v,
+            car.a,
+            car.time_ellapsed / PRECISION,
+            car.f_car.id if car.f_car is not None else -1,
+            car.b_car.id if car.b_car is not None else -1,
+        ]
+
 
 car_colors = ["car_b", "car_y", "car_k", "car_w", "car_g", "car_o", "car_p", "car_v"]
 
@@ -278,13 +295,15 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
 
         # Update AGP PRECISION times each frame
         for sub_t in range(PRECISION):
-            agp.update(frame * PRECISION + sub_t)
+            agp.update(frame * PRECISION + sub_t, exit_logger=log_exits, crash_logger=log_crash)
 
         # Add cars to the AGP
 
         # if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 10):
         # if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 100) and (np.random.poisson() == 1):
-        if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 80) and (not agp.get_back_car().crashes_upfront()):
+        if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 80) and (
+            not agp.get_back_car().crashes_upfront()
+        ):
             agp.add_car(
                 Car(
                     x=None,
@@ -296,7 +315,9 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
                     acc_throttle=np.random.normal(0.1, 0.01),
                     acc_stopping=np.random.normal(0.4, 0.001),
                     length=np.random.normal(4.5, 0.5),
-                    tr=np.random.normal(0.732, 0.163) if np.random.uniform() > 0.001 else 0,
+                    tr=np.random.normal(0.732, 0.163)
+                    if np.random.uniform() > 0.001
+                    else 0,
                     vd=int(np.random.normal(100, 5)),
                     fc=None,
                     bc=None,
@@ -310,10 +331,6 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
             log_agp_data(agp, frame)
             for car in agp.get_cars():
                 log_car_data(car, frame)
-
-                # Log exits
-                if car.get_position() > agp.length:
-                    log_exits(car)
 
             if frame % 100 == 0:
                 # Save data to CSV

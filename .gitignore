@@ -2,6 +2,7 @@
 
 logs/
 
+src/animation.mp4
 *.mp4
 
 # Byte-compiled / optimized / DLL files
@@ -166,3 +167,4 @@ cython_debug/
 #.idea/
 src/animation.mp4
 *.mp4
+src/animation.mp4

@@ -1,4 +1,5 @@
 import gc
+from typing import Callable
 import numpy as np
 from car import Car
 
@@ -155,7 +156,7 @@ class Highway:
                 self.crashes.remove((car, frame))
                 self.historic_crash_count += 1
 
-    def update(self, frame: int):
+    def update(self, frame: int, exit_logger: Callable, tow_logger: Callable):
         for car in self.cars:
             car.update(frame)
 
@@ -165,6 +166,7 @@ class Highway:
             if car.crashed:
                 if car not in [c for c, _ in self.crashes]:
                     print(f"AGP: Car {car.id} crashed at frame {frame}, queueing tow")
+                    tow_logger(car, frame)
                     self.crashes.append((car, frame))
 
             if self.has_crashes():
@@ -172,6 +174,7 @@ class Highway:
 
             if car.get_position() > self.length:
                 self.historic_trip_duration.append(car.time_ellapsed)
+                exit_logger(car, frame)
                 self.remove_car(car)
 
             if len(self.cars) > 0:

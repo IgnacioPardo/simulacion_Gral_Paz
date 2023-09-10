@@ -4,13 +4,13 @@ from car import Car
 
 
 class Highway:
-    def __init__(self, length: float):
+    def __init__(self, length: float, crash_remove_delay: int = 5000, precision: int = 1):
         self.length = length
         self.cars = []
         self.time = 0
 
         self.crashes = []
-        self.crash_remove_delay = 5000
+        self.crash_remove_delay = crash_remove_delay
         self.historic_ids = []
 
         self.historic_velocities = []
@@ -18,6 +18,8 @@ class Highway:
         self.historic_trip_duration = []
 
         self.historic_crash_count = 0
+
+        self.precision = precision
 
     def __len__(self):
         return len(self.cars)
@@ -95,6 +97,8 @@ class Highway:
         return self.cars[0]
 
     def add_car(self, car: Car):
+
+        car.set_precision(self.precision)
 
         if not car.id:
             car.id = len(self.historic_ids)

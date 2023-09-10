@@ -1,3 +1,11 @@
+"""
+Simulation of Avenida General Paz (AGP) from Liniers to Lugano in Buenos Aires, Argentina.
+Single lane, 14 km long, 100 km/h speed limit, mean of 1.5 m long cars.
+
+The simulation is based on the Intelligent Driver Model (IDM).
+
+"""
+
 from car import Car
 from highway import Highway
 
@@ -17,34 +25,69 @@ from tqdm import tqdm
 
 import random
 
-random.seed(42)
+import argparse
 
-np.random.seed(42)
+parser = argparse.ArgumentParser(description="Simulate a highway")
 
+parser.add_argument(
+    "--precision", type=int, help="Precision of the simulation", default=100
+)
+parser.add_argument(
+    "--frames", type=int, help="Number of frames to simulate", default=12000
+)
+parser.add_argument(
+    "--interval", type=int, help="Interval between frames in milliseconds", default=0
+)
+parser.add_argument("--fps", type=int, help="Frames per second", default=30)
+parser.add_argument(
+    "--length", type=int, help="Length of the highway in meters", default=14 * 1000
+)
+parser.add_argument(
+    "--max_v", type=int, help="Maximum velocity of the cars in km/h", default=100
+)
+parser.add_argument("--plot", type=bool, help="Plot the simulation", default=False)
+parser.add_argument("--live", type=bool, help="Plot the simulation live", default=False)
+parser.add_argument(
+    "--short_scale",
+    type=bool,
+    help="Plot the simulation with a short scale",
+    default=False,
+)
+parser.add_argument("--log", type=bool, help="Log the simulation", default=True)
+parser.add_argument(
+    "--seed", type=int, help="Seed for the random number generator", default=42
+)
+
+args = parser.parse_args()
 
 # Interval (Delay between frames in milliseconds) = 0
 # FPS = 30
 # Duration is going to be frames / fps (in seconds)
 # 600 * / 30 = 20 seconds
 
-PRECISION = 100
-FRAMES = 12000
-INTERVAL = 0
-FPS = 30
+PRECISION = args.precision
+FRAMES = args.frames
+INTERVAL = args.interval
+FPS = args.fps
 
 # Simulated Time = Frames (s)
 
-HIGHWAY_LENGTH = 14 * 1000
-MAX_V = 100  # km/h => Converts to m/s
+HIGHWAY_LENGTH = args.length  # m
+MAX_V = args.max_v  # km/h => Car converts to m/s
 
-PLOT = False
+PLOT = args.plot
 
-LIVE = False and PLOT
-SHORT_SCALE = False and PLOT
+LIVE = args.live and PLOT
+SHORT_SCALE = args.short_scale and PLOT
 
-LOG = True
+LOG = args.log
 AGP_LOG_FILE = f"logs/{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_agp_data.csv"
 CARS_LOG_FILE = f"logs/{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_cars_data.csv"
+
+SEED = args.seed
+
+random.seed(SEED)
+np.random.seed(SEED)
 
 if LOG:
 
@@ -103,14 +146,16 @@ if LOG:
             frame,
             car.id,
             np.mean(car.historic_velocities) if len(car.historic_velocities) > 0 else 0,
-            np.mean(car.historic_accelerations) if len(car.historic_accelerations) > 0 else 0,
+            np.mean(car.historic_accelerations)
+            if len(car.historic_accelerations) > 0
+            else 0,
             car.time_ellapsed / PRECISION,
         ]
 
 
 car_colors = ["car_b", "car_y", "car_k", "car_w", "car_g", "car_o", "car_p", "car_v"]
 
-agp = Highway(length=HIGHWAY_LENGTH)
+agp = Highway(length=HIGHWAY_LENGTH, crash_remove_delay=5000, precision=PRECISION)
 
 avg_v = 80
 avg_trip_time = HIGHWAY_LENGTH / avg_v

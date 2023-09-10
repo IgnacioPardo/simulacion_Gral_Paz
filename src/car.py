@@ -2,8 +2,6 @@ from typing import Optional
 
 import numpy as np
 
-PRECISION = 100
-
 
 class Car:
     def __init__(
@@ -79,6 +77,8 @@ class Car:
         self.historic_velocities = []
         self.historic_accelerations = []
 
+        self.precision = 1
+
     def __str__(self):
         return f"Car(x={self.x}, v={self.v}, vmax={self.vmax}, a={self.a}, l={self.length}, tr={self.get_reaction_time()}, vd={self.desired_velocity}, fc={self.f_car.id}, bc={self.b_car.id})"
 
@@ -87,6 +87,9 @@ class Car:
 
     def __eq__(self, other):
         return self.id == other.id
+
+    def set_precision(self, precision):
+        self.precision = precision
 
     def check_frontal_crash(self):
         if (
@@ -178,10 +181,10 @@ class Car:
 
     def physics(self):
         # Update position
-        self.x = self.x + self.v / PRECISION
+        self.x = self.x + self.v / self.precision
 
         # Update velocity
-        self.v = self.v + self.a / PRECISION
+        self.v = self.v + self.a / self.precision
 
         if self.stopping:
             self.v -= self.stopping_acc
@@ -295,16 +298,15 @@ class Car:
         low = np.random.uniform(1000, 9000)
         high = np.random.uniform(low, 10000)
         if self.x < low and self.x > high:
-            if np.random.uniform() < 0.01:
-                # self.crashed = True
-                self.v = self.vmax
-                self.stopping_acc = 0
-            if np.random.poisson(40) == 1:
+            if np.random.poisson(20) == 1:
+                random_action = np.random.choice(self.posible_actions)
                 for _ in range(100):
                     self.action_queue.append(
-                        (self.accelerate, frame + self.get_reaction_time())
+                        (random_action, frame + self.get_reaction_time())
                     )
-                self.action_queue.append((self.stop, frame + self.get_reaction_time()))
+                self.action_queue = list(
+                    filter(lambda x: x[0] == random_action, self.action_queue)
+                )
 
         if (
             self.highway
@@ -332,15 +334,6 @@ class Car:
             if self.increased_attention:
                 self.action_queue.append((self.default_attention, frame + 1))
 
-        # If the front car seems to be decelerating, I will decelerate
-        # A car should not know exactly the acceleration of the front car
-        if self.f_car is not None and self.f_car.a < np.random.normal(
-            0, 0.1 - 0.05 * self.increased_attention + 0.5 * self.decresed_attention
-        ):
-            self.action_queue.append(
-                (self.decelerate, frame + self.get_reaction_time())
-            )
-
         if not self.stopping:
             should_acc = True
 
@@ -354,6 +347,15 @@ class Car:
                         self.action_queue = list(
                             filter(lambda x: x[0] == self.stop, self.action_queue)
                         )
+                elif self.f_car.a < np.random.normal(
+                    0, 0.1 - 0.05 * self.increased_attention + 0.5 * self.decresed_attention
+                ):
+                    should_acc = False
+                    # If the front car seems to be decelerating, I will decelerate
+                    # A car should not know exactly the acceleration of the front car
+                    self.action_queue.append(
+                        (self.decelerate, frame + self.get_reaction_time())
+                    )
                 elif self.distance_to_front_car() <= 2 * self.v:
                     # LEQ Two seconds of distance: Decelerate
                     should_acc = False

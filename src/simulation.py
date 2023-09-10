@@ -299,10 +299,8 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
 
         # Add cars to the AGP
 
-        # if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 10):
-        # if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 100) and (np.random.poisson() == 1):
         if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 80) and (
-            not agp.get_back_car().crashes_upfront()
+            not agp.get_back_car().crashes_upfront() or np.random.poisson() == 1
         ):
             agp.add_car(
                 Car(

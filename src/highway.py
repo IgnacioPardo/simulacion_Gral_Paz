@@ -156,7 +156,7 @@ class Highway:
                 self.crashes.remove((car, frame))
                 self.historic_crash_count += 1
 
-    def update(self, frame: int, exit_logger: Callable, tow_logger: Callable):
+    def update(self, frame: int, exit_logger: Callable, crash_logger: Callable):
         for car in self.cars:
             car.update(frame)
 
@@ -166,7 +166,7 @@ class Highway:
             if car.crashed:
                 if car not in [c for c, _ in self.crashes]:
                     print(f"AGP: Car {car.id} crashed at frame {frame}, queueing tow")
-                    tow_logger(car, frame)
+                    crash_logger(car, frame)
                     self.crashes.append((car, frame))
 
             if self.has_crashes():

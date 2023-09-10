@@ -400,12 +400,12 @@ class Car:
                 elif (self.distance_to_front_car() <= 2 * self.v) or (
                     (self.distance_to_front_car() <= 10 * self.v)
                     and self.f_car.a
-                    < np.random.normal(
+                    < (np.random.normal(
                         0,
                         0.1
                         - 0.05 * self.increased_attention
                         + 0.5 * self.decresed_attention,
-                    )
+                    ) if self.reaction_time > 0 else 0)
                 ):
                     # elif (self.distance_to_front_car() <= 2 * self.v):
                     # LEQ Two seconds of distance: Decelerate
@@ -417,10 +417,10 @@ class Car:
                 elif (
                     self.v
                     < self.f_car.v
-                    + np.random.uniform(
+                    + (np.random.uniform(
                         0,
                         5 - 2 * self.increased_attention + 2 * self.decresed_attention,
-                    )
+                    ) if self.reaction_time > 0 else 0)
                     and self.v < self.desired_velocity
                 ):
                     # Same as the acceleration of the front car

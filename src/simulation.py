@@ -1,9 +1,18 @@
 """
-Simulation of Avenida General Paz (AGP) from Liniers to Lugano in Buenos Aires, Argentina.
-Single lane, 14 km long, 100 km/h speed limit, mean of 1.5 m long cars.
+* Simulation of Avenida General Paz (AGP) from Liniers to Lugano in Buenos Aires, Argentina.
 
-The simulation is based on the Intelligent Driver Model (IDM).
+* Single lane
+* 14 km long
+* 100 km/h speed limit
+* Car length: 4.5 m ± 0.5 m
 
+* Reaction times are taken from Evaluation of Driver’s Reaction Time Measured in Driving Simulator (https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9099898/)
+* Reaction times between 0.4 and 1 seconds: 0.732 ± 0.163
+
+* Car acceleration: 2 m/s² ± 1 m/s²
+* Car max acceleration: 3 m/s²
+* Car max velocity: 120 km/h ± 10 km/h
+* Car desired velocity: 100 km/h ± 5 km/h (100 km/h is the speed limit)
 """
 
 from car import Car
@@ -17,9 +26,6 @@ import pandas as pd
 
 import os
 from datetime import datetime
-
-# import cv2
-# from utils import rotate_bound
 
 from tqdm import tqdm
 
@@ -60,6 +66,8 @@ parser.add_argument(
 
 args = parser.parse_args()
 
+# run: python simulation.py --precision 100 --frames 12000 --interval 0 --fps 30 --length 14000 --max_v 100 --plot False --live False --short_scale False --log True --seed 42
+
 # Interval (Delay between frames in milliseconds) = 0
 # FPS = 30
 # Duration is going to be frames / fps (in seconds)
@@ -81,8 +89,10 @@ LIVE = args.live and PLOT
 SHORT_SCALE = args.short_scale and PLOT
 
 LOG = args.log
-AGP_LOG_FILE = f"logs/{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_agp_data.csv"
-CARS_LOG_FILE = f"logs/{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_cars_data.csv"
+ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+AGP_LOG_FILE = f"logs/{ts}/agp_data.csv"
+CARS_LOG_FILE = f"logs/{ts}/cars_data.csv"
+EXITS_LOG_FILE = f"logs/{ts}/exits_data.csv"
 
 SEED = args.seed
 
@@ -95,6 +105,8 @@ if LOG:
 
     if not os.path.exists("logs"):
         os.makedirs("logs")
+    if not os.path.exists(f"logs/{ts}"):
+        os.makedirs(f"logs/{ts}")
 
     agp_df = pd.DataFrame(
         columns=[
@@ -109,13 +121,26 @@ if LOG:
         ]
     )
 
-    times_df = pd.DataFrame(
+    cars_df = pd.DataFrame(
         columns=[
             "frame",
             "car_id",
-            "avg_car_v",
-            "avg_car_a",
+            "car_x",
+            "car_v",
+            "car_a",
             "car_t_d",
+            "f_car_id",
+            "b_car_id",
+        ]
+    )
+
+    exits_df = pd.DataFrame(
+        columns=[
+            "frame",
+            "car_id",
+            "avg_v",
+            "avg_a",
+            "t_d",
         ]
     )
 
@@ -123,9 +148,12 @@ if LOG:
         columns=[
             "frame",
             "car_id",
+            "car_x",
             "car_v",
             "car_a",
             "car_t_d",
+            "f_car_id",
+            "b_car_id",
         ]
     )
 
@@ -142,16 +170,25 @@ if LOG:
         ]
 
     def log_car_data(car: Car, frame: int):
-        times_df.loc[len(times_df)] = [
+        cars_df.loc[len(cars_df)] = [
+            frame,
+            car.id,
+            car.x,
+            car.v,
+            car.a,
+            car.time_ellapsed / PRECISION,
+            car.f_car.id if car.f_car is not None else -1,
+            car.b_car.id if car.b_car is not None else -1,
+        ]
+
+    def log_exits(car: Car):
+        exits_df.loc[len(exits_df)] = [
             frame,
             car.id,
             np.mean(car.historic_velocities) if len(car.historic_velocities) > 0 else 0,
-            np.mean(car.historic_accelerations)
-            if len(car.historic_accelerations) > 0
-            else 0,
+            np.mean(car.historic_accelerations) if len(car.historic_accelerations) > 0 else 0,
             car.time_ellapsed / PRECISION,
         ]
-
 
 car_colors = ["car_b", "car_y", "car_k", "car_w", "car_g", "car_o", "car_p", "car_v"]
 
@@ -162,6 +199,7 @@ avg_trip_time = HIGHWAY_LENGTH / avg_v
 
 with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
 
+    # Add a first car
     agp.add_car(
         Car(
             x=100,
@@ -170,7 +208,10 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
             vd=int(np.random.normal(MAX_V, 6)),
             a=max(0, int(np.random.normal(2, 1))),
             amax=np.random.uniform(1.5, 3),
-            length=1.5,
+            break_max=np.random.uniform(2, 4),
+            acc_throttle=np.random.normal(0.1, 0.01),
+            acc_stopping=np.random.normal(0.3, 0.01),
+            length=np.random.normal(4.5, 0.5),
             tr=np.random.normal(0.732, 0.163),
             fc=None,
             bc=None,
@@ -242,7 +283,7 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
 
         # if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 10):
         # if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 100) and (np.random.poisson() == 1):
-        if len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 80:
+        if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 80) and (not agp.get_back_car().crashes_upfront()):
             agp.add_car(
                 Car(
                     x=None,
@@ -250,17 +291,11 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
                     vmax=int(np.random.normal(120, 10)),
                     a=max(0, int(np.random.normal(2, 1))),
                     amax=np.random.uniform(1.5, 3),
-                    length=1.5,
-                    # Reaction times are between 0.4 and 1 seconds,
-                    #   Mean:  0.7316666666666668
-                    #   Median:  0.725
-                    #   Variance:  0.026653888888888883
-                    #   Standard Deviation:  0.16326018770321465
-                    #   Skewness:  -0.040838018027236994
+                    break_max=np.random.normal(3.5, 0.5),
+                    acc_throttle=np.random.normal(0.1, 0.01),
+                    acc_stopping=np.random.normal(0.4, 0.001),
+                    length=np.random.normal(4.5, 0.5),
                     tr=np.random.normal(0.732, 0.163),
-                    # tr=np.random.normal(0.9, 0.2),
-                    # tr=0.44,
-                    # tr=10,
                     vd=int(np.random.normal(100, 5)),
                     fc=None,
                     bc=None,
@@ -273,6 +308,10 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
             log_agp_data(agp, frame)
             for car in agp.get_cars():
                 log_car_data(car, frame)
+
+                # Log exits
+                if car.get_position() > agp.length:
+                    log_exits(car)
 
         if PLOT:
 
@@ -496,4 +535,6 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
             if LOG and frame % 100 == 0:
                 # Save data to CSV
                 agp_df.to_csv(AGP_LOG_FILE)
-                times_df.to_csv(CARS_LOG_FILE)
+                cars_df.to_csv(CARS_LOG_FILE)
+
+                exits_df.to_csv(EXITS_LOG_FILE)

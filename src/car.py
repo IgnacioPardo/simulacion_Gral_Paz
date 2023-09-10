@@ -11,6 +11,9 @@ class Car:
         vmax: float,
         a: float,
         amax: float,
+        break_max: float,
+        acc_throttle: float,
+        acc_stopping: float,
         length: float,
         tr: float,
         vd: float,
@@ -42,8 +45,10 @@ class Car:
         self.a = a
         self.amax = amax
 
-        self.throttle_acc = 0.1
-        self.stopping_acc = 0.3
+        self.max_brake_acc = break_max
+
+        self.throttle_acc = acc_throttle
+        self.stopping_acc = acc_stopping
 
         self.length = length
 
@@ -127,8 +132,8 @@ class Car:
 
     def decelerate(self):
         self.a -= self.stopping_acc / 5
-        if self.a < -4:
-            self.a = -4
+        if self.a < -self.max_brake_acc:
+            self.a = -self.max_brake_acc
 
     def stop(self):
         self.stopping = True
@@ -138,7 +143,6 @@ class Car:
 
     def distance_to_front_car(self) -> Optional[float]:
         """Calculates the distance to the front car
-
 
         Returns:
             float: Front Car X - Car X
@@ -265,48 +269,63 @@ class Car:
         return False
 
     def slugish_behavior(self, frame):
-        if self.v < 0.1:
-            self.action_queue.append(
-                (self.accelerate, frame + self.get_reaction_time())
-            )
+        # If i have a bunch of cars behind me
+        # but not a close one in front of me
+        # , I will increase my speed
+        if self.highway:
+            cars_close_behind = 0
+            for car in self.highway.get_cars():
+                if car != self and car.x < self.x and car.x > self.x - 10 * self.v:
+                    cars_close_behind += 1
+
+            if (
+                cars_close_behind > 10
+                and self.x > 3000
+                and self.f_car is not None
+                and self.distance_to_front_car() > 20 * self.v
+            ):
+
+                for _ in range(10):
+                    self.action_queue.append(
+                        (self.accelerate, frame + self.get_reaction_time())
+                    )
 
     def sleepy_behavior(self, frame):
-        # if acceleration didnt change much in the last updates
+        # if acceleration or velocities didnt change much in the last updates
         # enter Decresed Attention mode
 
-        if len(self.historic_accelerations) > 10:
-            if (
+        if (
+            len(self.historic_accelerations) > 10
+            and (
                 np.std(self.historic_accelerations[-10:]) < 0.1
                 and not self.increased_attention
-                and np.random.uniform() < 0.1
-            ):
-                self.decresed_attention = True
-            else:
-                self.decresed_attention = False
-
-        if len(self.historic_velocities) > 10:
-            if (
+                and np.random.uniform() < 0.2
+            )
+            or (len(self.historic_velocities) > 10)
+            and (
                 np.std(self.historic_velocities[-10:]) < 0.1
                 and not self.increased_attention
-                and np.random.uniform() < 0.1
-            ):
-                self.decresed_attention = True
-            else:
-                self.decresed_attention = False
+                and np.random.uniform() < 0.2
+            )
+        ):
+            self.decresed_attention = True
+        else:
+            self.decresed_attention = False
 
     def custom_behavior(self, frame):
-        low = np.random.uniform(1000, 9000)
-        high = np.random.uniform(low, 10000)
-        if self.x < low and self.x > high:
-            if np.random.poisson(20) == 1:
-                random_action = np.random.choice(self.posible_actions)
+        if np.random.poisson(100) == 1:
+            low = np.random.uniform(1000, 9000)
+            high = np.random.uniform(low, 10000)
+            if self.x < low and self.x > high:
+                # random_action = np.random.choice(self.posible_actions)
+                random_action = self.decelerate
                 for _ in range(100):
                     self.action_queue.append(
                         (random_action, frame + self.get_reaction_time())
                     )
-                self.action_queue = list(
-                    filter(lambda x: x[0] == random_action, self.action_queue)
-                )
+                # self.action_queue = list(
+                #     filter(lambda x: x[0] == random_action, self.action_queue)
+                # )
 
         if (
             self.highway
@@ -327,7 +346,13 @@ class Car:
     def behaviour(self, frame):
 
         # If there are cars in front of me, I will slow down
-        if self.crashes_upfront():
+        # If front car is stopping
+        if self.crashes_upfront() or (
+            self.f_car is not None
+            and self.f_car.stopping
+            and (self.distance_to_front_car() <= 5 * self.v)
+            and np.random.uniform() < 0.5
+        ):
             if not self.increased_attention:
                 self.action_queue.append((self.increase_attention, frame + 1))
         else:
@@ -338,7 +363,7 @@ class Car:
             should_acc = True
 
             if self.f_car is not None:
-                if self.f_car.has_collided() or self.f_car.stopping:
+                if self.f_car.has_collided():
                     should_acc = False
                     if self.distance_to_front_car() <= 8 * self.v:
                         self.action_queue.append(
@@ -347,17 +372,19 @@ class Car:
                         self.action_queue = list(
                             filter(lambda x: x[0] == self.stop, self.action_queue)
                         )
-                elif self.f_car.a < np.random.normal(
-                    0, 0.1 - 0.05 * self.increased_attention + 0.5 * self.decresed_attention
-                ):
-                    should_acc = False
-                    # If the front car seems to be decelerating, I will decelerate
-                    # A car should not know exactly the acceleration of the front car
-                    self.action_queue.append(
-                        (self.decelerate, frame + self.get_reaction_time())
+                elif (self.distance_to_front_car() <= 2 * self.v) or (
+                    (self.distance_to_front_car() <= 10 * self.v)
+                    and self.f_car.a
+                    < np.random.normal(
+                        0,
+                        0.1
+                        - 0.05 * self.increased_attention
+                        + 0.5 * self.decresed_attention,
                     )
-                elif self.distance_to_front_car() <= 2 * self.v:
+                ):
+                    # elif (self.distance_to_front_car() <= 2 * self.v):
                     # LEQ Two seconds of distance: Decelerate
+                    # Front car is close and decelerating
                     should_acc = False
                     self.action_queue.append(
                         (self.decelerate, frame + self.get_reaction_time())

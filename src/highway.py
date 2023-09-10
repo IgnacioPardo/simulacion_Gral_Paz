@@ -1,3 +1,5 @@
+import gc
+import numpy as np
 from car import Car
 
 
@@ -8,8 +10,39 @@ class Highway:
         self.time = 0
 
         self.crashes = []
-        self.crash_remove_delay = 10000
+        self.crash_remove_delay = 5000
         self.historic_ids = []
+
+        self.historic_velocities = []
+        self.historic_accelerations = []
+        self.historic_trip_duration = []
+
+        # self.avg_v = 0
+        # self.avg_a = 0
+        # self.avg_trip_duration = 0
+
+        self.historic_crash_count = 0
+
+    def __len__(self):
+        return len(self.cars)
+
+    def get_crash_count(self):
+        return self.historic_crash_count
+
+    def get_avg_v(self):
+        if len(self.historic_velocities) == 0:
+            return 0
+        return np.mean(self.historic_velocities)
+
+    def get_avg_a(self):
+        if len(self.historic_accelerations) == 0:
+            return 0
+        return np.mean(self.historic_accelerations)
+
+    def get_avg_trip_duration(self):
+        if len(self.historic_trip_duration) == 0:
+            return 0
+        return np.mean(self.historic_trip_duration)
 
     def __str__(self):
         return (
@@ -73,24 +106,31 @@ class Highway:
 
     def remove_car(self, car: Car):
         if car in self.cars:
-            print(f"AGP: Removing car {car.id} from highway at frame {self.time}")
             # Remove references to car
             if car.f_car:
                 car.f_car.b_car = car.b_car
             if car.b_car:
                 car.b_car.f_car = car.f_car
-            
+
             self.cars.remove(car)
+
+            del car
+            gc.collect()
 
     def tow_cars(self, now: bool = False):
         for car, frame in self.crashes:
             if now or frame + self.crash_remove_delay == self.time:
+                print(f"AGP: Towing car {car.id} from {car.x} at frame {self.time}")
                 self.remove_car(car)
                 self.crashes.remove((car, frame))
+                self.historic_crash_count += 1
 
     def update(self, frame: int):
         for car in self.cars:
             car.update(frame)
+
+            self.historic_velocities.append(car.v)
+            self.historic_accelerations.append(car.a)
 
             if car.crashed:
                 if car not in [c for c, _ in self.crashes]:
@@ -101,7 +141,8 @@ class Highway:
                 self.tow_cars()
 
             if car.get_position() > self.length:
-                self.cars.remove(car)
+                self.historic_trip_duration.append(car.t)
+                self.remove_car(car)
 
             if len(self.cars) > 0:
                 self.cars[-1].f_car = None

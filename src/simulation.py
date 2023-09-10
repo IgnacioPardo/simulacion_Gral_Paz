@@ -74,12 +74,12 @@ args = parser.parse_args()
 # Duration is going to be frames / fps (in seconds)
 # 600 * / 30 = 20 seconds
 
+# Simulated Time = Frames (s)
+
 PRECISION = args.precision
 FRAMES = args.frames
 INTERVAL = args.interval
 FPS = args.fps
-
-# Simulated Time = Frames (s)
 
 HIGHWAY_LENGTH = args.length  # m
 MAX_V = args.max_v  # km/h => Car converts to m/s
@@ -104,11 +104,10 @@ np.random.seed(SEED)
 if LOG:
 
     # Check if log directory exists
-
     if not os.path.exists("logs"):
         os.makedirs("logs")
     if not os.path.exists(f"logs/{ts}"):
-        os.makedirs(f"logs/{ts}")
+       os.makedirs(f"logs/{ts}")
 
     agp_df = pd.DataFrame(
         columns=[
@@ -316,6 +315,24 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
                 if car.get_position() > agp.length:
                     log_exits(car)
 
+            if frame % 100 == 0:
+                # Save data to CSV
+                agp_df.to_csv(AGP_LOG_FILE)
+                cars_df.to_csv(CARS_LOG_FILE)
+                exits_df.to_csv(EXITS_LOG_FILE)
+
+        pbar.set_postfix(
+            cars=f"{len(agp.get_cars())}",
+            crashes=f"{agp.get_crash_count()}",
+            all_cars=f"{len(agp.historic_ids)}",
+            avg_v=f"{agp.get_avg_v()*3.6:.2f}",
+            avg_a=f"{agp.get_avg_a():.2f}",
+            avg_t_d=f"{agp.get_avg_trip_duration():.2f}",
+            avg_h_v=f"{agp.get_avg_v()*3.6:.2f}",
+            avg_h_a=f"{agp.get_avg_a():.2f}",
+            avg_h_t_d=f"{agp.get_avg_trip_duration():.2f}",
+        )
+
         if PLOT:
             # Gather AGP current data
             xdata = agp.get_cars_positions()
@@ -494,18 +511,6 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
                 ax.set_ylim(-10, 10)
             return artists
 
-        pbar.set_postfix(
-            cars=f"{len(agp.get_cars())}",
-            crashes=f"{agp.get_crash_count()}",
-            all_cars=f"{len(agp.historic_ids)}",
-            avg_v=f"{agp.get_avg_v()*3.6:.2f}",
-            avg_a=f"{agp.get_avg_a():.2f}",
-            avg_t_d=f"{agp.get_avg_trip_duration():.2f}",
-            avg_h_v=f"{agp.get_avg_v()*3.6:.2f}",
-            avg_h_a=f"{agp.get_avg_a():.2f}",
-            avg_h_t_d=f"{agp.get_avg_trip_duration():.2f}",
-        )
-
         return None
 
     if PLOT:
@@ -535,10 +540,3 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
     else:
         for frame in tqdm(range(FRAMES)):
             update(frame)
-
-            if LOG and frame % 100 == 0:
-                # Save data to CSV
-                agp_df.to_csv(AGP_LOG_FILE)
-                cars_df.to_csv(CARS_LOG_FILE)
-
-                exits_df.to_csv(EXITS_LOG_FILE)

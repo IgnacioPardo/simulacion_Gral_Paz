@@ -52,6 +52,7 @@ parser.add_argument(
     "--max_v", type=int, help="Maximum velocity of the cars in km/h", default=100
 )
 parser.add_argument("--plot", type=bool, help="Plot the simulation", default=False)
+parser.add_argument("--text", type=bool, help="Plot text in the simulation", default=False)
 parser.add_argument("--live", type=bool, help="Plot the simulation live", default=False)
 parser.add_argument(
     "--short_scale",
@@ -84,6 +85,7 @@ HIGHWAY_LENGTH = args.length  # m
 MAX_V = args.max_v  # km/h => Car converts to m/s
 
 PLOT = args.plot
+PLOT_TEXT = args.text and PLOT
 
 LIVE = args.live and PLOT
 SHORT_SCALE = args.short_scale and PLOT
@@ -205,7 +207,7 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
             x=100,
             v=int(np.random.uniform(50, 80)),
             vmax=int(np.random.normal(140, 20)),
-            vd=int(np.random.normal(MAX_V, 6)),
+            vd=int(np.random.normal(MAX_V, 10)),
             a=max(0, int(np.random.normal(2, 1))),
             amax=np.random.uniform(1.5, 3),
             break_max=np.random.uniform(2, 4),
@@ -295,11 +297,12 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
                     acc_throttle=np.random.normal(0.1, 0.01),
                     acc_stopping=np.random.normal(0.4, 0.001),
                     length=np.random.normal(4.5, 0.5),
-                    tr=np.random.normal(0.732, 0.163),
+                    tr=np.random.normal(0.732, 0.163) if np.random.uniform() > 0.001 else 0,
                     vd=int(np.random.normal(100, 5)),
                     fc=None,
                     bc=None,
                     will_measure=True,
+                    has_random_behavior=np.random.uniform() > 0.4,
                 )
             )
 
@@ -314,7 +317,6 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
                     log_exits(car)
 
         if PLOT:
-
             # Gather AGP current data
             xdata = agp.get_cars_positions()
             vdata = agp.get_cars_velocities()
@@ -353,141 +355,143 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
                 ab = AnnotationBbox(car_oi, (x, 0), frameon=False)
                 artists.append(ax.add_artist(ab))
 
-            # Plot Frame number
-            ax.text(
-                0.01,
-                0.9,
-                f"F:{frame}/{FRAMES}",
-                transform=ax.transAxes,
-                fontfamily="monospace",
-            )
-            # Plot ammount of cars
-            ax.text(
-                0.01,
-                0.8,
-                f"# Cars: {len(agp.get_cars())}",
-                transform=ax.transAxes,
-                fontfamily="monospace",
-            )
+            if PLOT_TEXT:
+                # Plot Frame number
+                ax.text(
+                    0.01,
+                    0.9,
+                    f"F:{frame}/{FRAMES}",
+                    transform=ax.transAxes,
+                    fontfamily="monospace",
+                )
+                # Plot ammount of cars
+                ax.text(
+                    0.01,
+                    0.8,
+                    f"# Cars: {len(agp.get_cars())}",
+                    transform=ax.transAxes,
+                    fontfamily="monospace",
+                )
 
-            # Plot crash count
-            ax.text(
-                0.01,
-                0.7,
-                f"# Crashes: {agp.get_crash_count()}",
-                transform=ax.transAxes,
-                fontfamily="monospace",
-            )
+                # Plot crash count
+                ax.text(
+                    0.01,
+                    0.7,
+                    f"# Crashes: {agp.get_crash_count()}",
+                    transform=ax.transAxes,
+                    fontfamily="monospace",
+                )
 
-            # Plot Front Car Speed
-            ax.text(
-                0.01,
-                0.6,
-                f"F Car V: {agp.get_front_car().get_velocity()*3.6:.2f}",
-                transform=ax.transAxes,
-                fontfamily="monospace",
-            )
+                # Plot Front Car Speed
+                ax.text(
+                    0.01,
+                    0.6,
+                    f"F Car V: {agp.get_front_car().get_velocity()*3.6:.2f}",
+                    transform=ax.transAxes,
+                    fontfamily="monospace",
+                )
 
-            # Plot car velocities and positions as text
-            ax.text(
-                0.15,
-                0.9,
-                f"Accelerations: {dis(adata[::-1])}",
-                transform=ax.transAxes,
-                fontfamily="monospace",
-            )
-            ax.text(
-                0.15,
-                0.8,
-                f"Velocities   : {list(map(lambda x: ' ' * (6 - len(f'{x*3.6:.2f}')) + f'{x*3.6:.2f}', vdata[::-1]))}",
-                transform=ax.transAxes,
-                fontfamily="monospace",
-            )
-            ax.text(
-                0.15,
-                0.7,
-                f"Times        : {dis(tdata[::-1])}",
-                transform=ax.transAxes,
-                fontfamily="monospace",
-            )
-            ax.text(
-                0.15,
-                0.6,
-                f"Positions    : {dis(xdata[::-1])}",
-                transform=ax.transAxes,
-                fontfamily="monospace",
-            )
-            ax.text(
-                0.15,
-                0.5,
-                f"Crashes      : {crashes[::-1]}",
-                transform=ax.transAxes,
-                fontfamily="monospace",
-            )
-            ax.text(
-                0.15,
-                0.4,
-                f"Stopped      : {stopped[::-1]}",
-                transform=ax.transAxes,
-                fontfamily="monospace",
-            )
-            ax.text(
-                0.15,
-                0.3,
-                f"IDs          : {ids[::-1]}",
-                transform=ax.transAxes,
-                fontfamily="monospace",
-            )
+                # Plot car velocities and positions as text
+                ax.text(
+                    0.15,
+                    0.9,
+                    f"Accelerations: {dis(adata[::-1])}",
+                    transform=ax.transAxes,
+                    fontfamily="monospace",
+                )
+                ax.text(
+                    0.15,
+                    0.8,
+                    f"Velocities   : {list(map(lambda x: ' ' * (6 - len(f'{x*3.6:.2f}')) + f'{x*3.6:.2f}', vdata[::-1]))}",
+                    transform=ax.transAxes,
+                    fontfamily="monospace",
+                )
+                ax.text(
+                    0.15,
+                    0.7,
+                    f"Times        : {dis(tdata[::-1])}",
+                    transform=ax.transAxes,
+                    fontfamily="monospace",
+                )
+                ax.text(
+                    0.15,
+                    0.6,
+                    f"Positions    : {dis(xdata[::-1])}",
+                    transform=ax.transAxes,
+                    fontfamily="monospace",
+                )
+                ax.text(
+                    0.15,
+                    0.5,
+                    f"Crashes      : {crashes[::-1]}",
+                    transform=ax.transAxes,
+                    fontfamily="monospace",
+                )
+                ax.text(
+                    0.15,
+                    0.4,
+                    f"Stopped      : {stopped[::-1]}",
+                    transform=ax.transAxes,
+                    fontfamily="monospace",
+                )
+                ax.text(
+                    0.15,
+                    0.3,
+                    f"IDs          : {ids[::-1]}",
+                    transform=ax.transAxes,
+                    fontfamily="monospace",
+                )
 
-            # Plot Avg. Acceleration
-            ax.text(
-                0.07,
-                0.9,
-                f"Avg.Cur. A: {np.mean(adata):.2f}",
-                transform=ax.transAxes,
-                fontfamily="monospace",
-            )
-            # Plot Avg. Velocity
-            ax.text(
-                0.07,
-                0.8,
-                f"Avg.Cur. V: {np.mean(vdata)*3.6:.2f}",
-                transform=ax.transAxes,
-            )
-            # Plot Avg. Trip Duration
-            ax.text(
-                0.07,
-                0.7,
-                f"Avg.Cur. T: {np.mean(tdata):.2f}",
-                transform=ax.transAxes,
-                fontfamily="monospace",
-            )
+                # Plot Avg. Acceleration
+                ax.text(
+                    0.07,
+                    0.9,
+                    f"Avg.Cur. A: {np.mean(adata):.2f}",
+                    transform=ax.transAxes,
+                    fontfamily="monospace",
+                )
+                # Plot Avg. Velocity
+                ax.text(
+                    0.07,
+                    0.8,
+                    f"Avg.Cur. V: {np.mean(vdata)*3.6:.2f}",
+                    transform=ax.transAxes,
+                )
+                # Plot Avg. Trip Duration
+                ax.text(
+                    0.07,
+                    0.7,
+                    f"Avg.Cur. T: {np.mean(tdata):.2f}",
+                    transform=ax.transAxes,
+                    fontfamily="monospace",
+                )
 
-            # Plot Avg. Acceleration
-            ax.text(
-                0.07,
-                0.5,
-                f"Avg.H. A: {agp.get_avg_a():.2f}",
-                transform=ax.transAxes,
-                fontfamily="monospace",
-            )
-            # Plot Avg. Velocity
-            ax.text(
-                0.07,
-                0.4,
-                f"Avg.H. V: {agp.get_avg_v()*3.6:.2f}",
-                transform=ax.transAxes,
-                fontfamily="monospace",
-            )
-            # Plot Avg. Trip Duration
-            ax.text(
-                0.07,
-                0.3,
-                f"Avg. Dur: {agp.get_avg_trip_duration():.2f}",
-                transform=ax.transAxes,
-                fontfamily="monospace",
-            )
-
+                # Plot Avg. Acceleration
+                ax.text(
+                    0.07,
+                    0.5,
+                    f"Avg.H. A: {agp.get_avg_a():.2f}",
+                    transform=ax.transAxes,
+                    fontfamily="monospace",
+                )
+                # Plot Avg. Velocity
+                ax.text(
+                    0.07,
+                    0.4,
+                    f"Avg.H. V: {agp.get_avg_v()*3.6:.2f}",
+                    transform=ax.transAxes,
+                    fontfamily="monospace",
+                )
+                # Plot Avg. Trip Duration
+                ax.text(
+                    0.07,
+                    0.3,
+                    f"Avg. Dur: {agp.get_avg_trip_duration():.2f}",
+                    transform=ax.transAxes,
+                    fontfamily="monospace",
+                )
+            else:
+                ax.set_ylim(-10, 10)
             return artists
 
         pbar.set_postfix(

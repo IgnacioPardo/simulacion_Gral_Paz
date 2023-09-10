@@ -17,23 +17,44 @@ class Car:
         length: float,
         tr: float,
         vd: float,
-        bc: "Car",
+        bc: Optional["Car"] = None,
         fc: Optional["Car"] = None,
         will_measure: Optional[bool] = False,
         init_frame: Optional[int] = None,
         car_id: Optional[int] = None,
+        has_random_behavior: Optional[bool] = False,
     ):
+        """ Car class
+
+        Args:
+            x (float): Position in meters from the start of the highway
+            v (float): Velocity in km/h
+            vmax (float): Maximum velocity in km/h
+            a (float): Acceleration in m/s^2
+            amax (float): Maximum acceleration in m/s^2
+            break_max (float): Maximum breaking acceleration in m/s^2
+            acc_throttle (float): Delta acceleration when accelerating in m/s^2
+            acc_stopping (float): Delta acceleration when stopping in m/s^2
+            length (float): Length of the car in meters
+            tr (float): Reaction time in seconds
+            vd (float): Desired velocity in km/h
+            bc (Optional[&quot;Car&quot;], optional): Back car. Defaults to None.
+            fc (Optional[&quot;Car&quot;], optional): Front car. Defaults to None.
+            will_measure (Optional[bool], optional): Defaults to False.
+            init_frame (Optional[int], optional): Initial frame. Defaults to None.
+            car_id (Optional[int], optional): Car ID. Defaults to None. If None, a random ID will be generated.
+
+        * Internally, we use SI units
+        * Position in meters
+        * Externally, we use km/h for velocity
+        * But we convert it to m/s internally
+        * Velocity in m/s
+        * Acceleration is in m/s^2
+        """
+
         self.id = np.random.randint(0, 1000000) if car_id is None else car_id
 
         self.time_ellapsed = 0
-
-        # Internally, we use SI units
-        # Position in meters
-        # Velocity in m/s
-        # Acceleration is in m/s^2
-
-        # Externally, we use km/h for velocity
-        # But we convert it to m/s internally
 
         self.x = x
 
@@ -83,6 +104,8 @@ class Car:
         self.historic_accelerations = []
 
         self.precision = 1
+
+        self.has_random_behavior = has_random_behavior
 
     def __str__(self):
         return f"Car(x={self.x}, v={self.v}, vmax={self.vmax}, a={self.a}, l={self.length}, tr={self.get_reaction_time()}, vd={self.desired_velocity}, fc={self.f_car.id}, bc={self.b_car.id})"
@@ -220,7 +243,9 @@ class Car:
             # Queue actions to be taken in (frame + reaction_time)
             # Crashing does not take into account reaction time, its immediate
 
-            self.custom_behavior(frame)
+            if self.has_random_behavior:
+                self.custom_behavior(frame)
+
             self.slugish_behavior(frame)
             self.sleepy_behavior(frame)
 
@@ -256,10 +281,10 @@ class Car:
 
     def get_reaction_time(self):
         if self.increased_attention:
-            return self.reaction_time / 2
+            return self.reaction_time / 2 * self.precision
         elif self.decresed_attention:
-            return self.reaction_time * 1.8
-        return self.reaction_time
+            return self.reaction_time * 1.8 * self.precision
+        return self.reaction_time * self.precision
 
     def crashes_upfront(self):
         if self.highway:
@@ -272,7 +297,7 @@ class Car:
         # If i have a bunch of cars behind me
         # but not a close one in front of me
         # , I will increase my speed
-        if self.highway:
+        if self.highway and np.random.uniform() < 0.1:
             cars_close_behind = 0
             for car in self.highway.get_cars():
                 if car != self and car.x < self.x and car.x > self.x - 10 * self.v:
@@ -285,9 +310,9 @@ class Car:
                 and self.distance_to_front_car() > 20 * self.v
             ):
 
-                for _ in range(10):
+                for i in range(10):
                     self.action_queue.append(
-                        (self.accelerate, frame + self.get_reaction_time())
+                        (self.accelerate, frame + self.get_reaction_time() + i)
                     )
 
     def sleepy_behavior(self, frame):
@@ -317,15 +342,15 @@ class Car:
             low = np.random.uniform(1000, 9000)
             high = np.random.uniform(low, 10000)
             if self.x < low and self.x > high:
-                # random_action = np.random.choice(self.posible_actions)
-                random_action = self.decelerate
-                for _ in range(100):
+                random_action = np.random.choice(self.posible_actions)
+                # random_action = self.decelerate
+                for i in range(100):
                     self.action_queue.append(
-                        (random_action, frame + self.get_reaction_time())
+                        (random_action, frame + self.get_reaction_time() + i)
                     )
-                # self.action_queue = list(
-                #     filter(lambda x: x[0] == random_action, self.action_queue)
-                # )
+                self.action_queue = list(
+                    filter(lambda x: x[0] == random_action, self.action_queue)
+                )
 
         if (
             self.highway

@@ -97,11 +97,37 @@ ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 AGP_LOG_FILE = f"logs/{ts}/agp_data.csv"
 CARS_LOG_FILE = f"logs/{ts}/cars_data.csv"
 EXITS_LOG_FILE = f"logs/{ts}/exits_data.csv"
+CRASHES_LOG_FILE = f"logs/{ts}/crashes_data.csv"
 
 SEED = args.seed
 
+
 random.seed(SEED)
 np.random.seed(SEED)
+
+
+def SmartCar():
+    return Car(
+        x=None,
+        v=60,
+        vmax=120,
+        vd=MAX_V,
+        a=2,
+        amax=3,
+        break_max=3.5,
+        acc_throttle=0.1,
+        acc_stopping=0.4,
+        length=4.5,
+        tr=0,
+        fc=None,
+        bc=None,
+        will_measure=True,
+        has_random_behavior=False,
+    )
+
+
+SMART_CAR_PROBABILITY = 0
+
 
 if LOG:
 
@@ -295,34 +321,39 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
 
         # Update AGP PRECISION times each frame
         for sub_t in range(PRECISION):
-            agp.update(frame * PRECISION + sub_t, exit_logger=log_exits, crash_logger=log_crash)
+            agp.update(
+                frame * PRECISION + sub_t, exit_logger=log_exits, crash_logger=log_crash
+            )
 
         # Add cars to the AGP
 
         if (len(agp.get_cars()) == 0 or agp.get_back_car().get_position() > 80) and (
             not agp.get_back_car().crashes_upfront() or np.random.poisson() == 1
         ):
-            agp.add_car(
-                Car(
-                    x=None,
-                    v=int(np.random.uniform(50, 80)),
-                    vmax=int(np.random.normal(120, 10)),
-                    a=max(0, int(np.random.normal(2, 1))),
-                    amax=np.random.uniform(1.5, 3),
-                    break_max=np.random.normal(3.5, 0.5),
-                    acc_throttle=np.random.normal(0.1, 0.01),
-                    acc_stopping=np.random.normal(0.4, 0.001),
-                    length=np.random.normal(4.5, 0.5),
-                    tr=np.random.normal(0.732, 0.163)
-                    if np.random.uniform() > 0.001
-                    else 0,
-                    vd=int(np.random.normal(100, 5)),
-                    fc=None,
-                    bc=None,
-                    will_measure=True,
-                    has_random_behavior=np.random.uniform() > 0.4,
+            if np.random.uniform() < SMART_CAR_PROBABILITY:
+                agp.add_car(SmartCar())
+            else:
+                agp.add_car(
+                    Car(
+                        x=None,
+                        v=int(np.random.uniform(50, 80)),
+                        vmax=int(np.random.normal(120, 10)),
+                        a=max(0, int(np.random.normal(2, 1))),
+                        amax=np.random.uniform(1.5, 3),
+                        break_max=np.random.normal(3.5, 0.5),
+                        acc_throttle=np.random.normal(0.1, 0.01),
+                        acc_stopping=np.random.normal(0.4, 0.001),
+                        length=np.random.normal(4.5, 0.5),
+                        tr=np.random.normal(0.732, 0.163)
+                        if np.random.uniform() > 0.001
+                        else 0,
+                        vd=int(np.random.normal(100, 5)),
+                        fc=None,
+                        bc=None,
+                        will_measure=True,
+                        has_random_behavior=np.random.uniform() > 0.4,
+                    )
                 )
-            )
 
         # Log AGP current data
         if LOG:
@@ -335,6 +366,7 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
                 agp_df.to_csv(AGP_LOG_FILE)
                 cars_df.to_csv(CARS_LOG_FILE)
                 exits_df.to_csv(EXITS_LOG_FILE)
+                crashes_df.to_csv(CRASHES_LOG_FILE)
 
         pbar.set_postfix(
             cars=f"{len(agp.get_cars())}",
@@ -547,7 +579,7 @@ with tqdm(total=FRAMES, desc="Frames", unit="frame") as pbar:
             )
 
             ani.save(
-                "animation.mp4",
+                f"animation_{ts}.mp4",
                 fps=FPS,
                 extra_args=["-vcodec", "libx264", "-pix_fmt", "yuv420p"],
             )

@@ -60,8 +60,7 @@ class Car:
 
         self.v = v / 3.6
         self.vmax = vmax / 3.6
-        vd = vd / 3.6
-        self.desired_velocity = vd if vd < self.vmax else self.vmax
+        self.desired_velocity = min(vd / 3.6, self.vmax)
 
         self.a = a
         self.amax = amax

@@ -67,6 +67,10 @@ parser.add_argument(
     "--seed", type=int, help="Seed for the random number generator", default=42
 )
 
+parser.add_argument(
+    "--smart_car_probability", type=float, help="Probability of a smart car", default=0
+)
+
 args = parser.parse_args()
 
 # run: python simulation.py --precision 100 --frames 12000 --interval 0 --fps 30 --length 14000 --max_v 100 --plot False --live False --short_scale False --log True --seed 42
@@ -105,6 +109,8 @@ SEED = args.seed
 random.seed(SEED)
 np.random.seed(SEED)
 
+SMART_CAR_PROBABILITY = args.smart_car_probability
+
 
 def SmartCar():
     return Car(
@@ -124,9 +130,6 @@ def SmartCar():
         will_measure=True,
         has_random_behavior=False,
     )
-
-
-SMART_CAR_PROBABILITY = 0
 
 
 if LOG:
@@ -170,6 +173,7 @@ if LOG:
             "avg_v",
             "avg_a",
             "t_d",
+            "init_frame",
         ]
     )
 
@@ -219,6 +223,7 @@ if LOG:
             if len(car.historic_accelerations) > 0
             else 0,
             car.time_ellapsed / PRECISION,
+            car.init_frame,
         ]
 
     def log_crash(car: Car, frame: int):
